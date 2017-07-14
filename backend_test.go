@@ -7,6 +7,9 @@ import "testing"
 var validParams = []ErasureCodeParams{
 	{"liberasurecode_rs_vand", 2, 1, 0},
 	{"liberasurecode_rs_vand", 10, 4, 0},
+	{"liberasurecode_rs_vand", 4, 3, 0},
+	{"liberasurecode_rs_vand", 8, 4, 0},
+	{"liberasurecode_rs_vand", 15, 4, 0},
 }
 
 var testPatterns = [][]byte{
