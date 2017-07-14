@@ -10,8 +10,6 @@ var validArgs = []struct {
 }{
 	{"liberasurecode_rs_vand", 2, 1},
 	{"liberasurecode_rs_vand", 10, 4},
-	{"isa_l_rs_vand", 10, 4},
-	{"jerasure_rs_vand", 10, 4},
 }
 
 var testPatterns = [][]byte{
