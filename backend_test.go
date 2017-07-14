@@ -61,8 +61,6 @@ func TestInitBackendFailure(t *testing.T) {
 		k, m int
 		want string
 	}{
-		{"liberasurecode_rs_vand", 2, 0,
-			"instance_create() returned EBACKENDINITERR"},
 		{"liberasurecode_rs_vand", -1, 1,
 			"instance_create() returned EINVALIDPARAMS"},
 		{"liberasurecode_rs_vand", 10, -1,
