@@ -75,37 +75,35 @@ func TestInitBackend(t *testing.T) {
 
 func TestInitBackendFailure(t *testing.T) {
 	cases := []struct {
-		name string
-		k, m int
-		want string
+		params ErasureCodeParams
+		want   string
 	}{
-		{"liberasurecode_rs_vand", -1, 1,
+		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: -1, M: 1},
 			"instance_create() returned EINVALIDPARAMS"},
-		{"liberasurecode_rs_vand", 10, -1,
+		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: 10, M: -1},
 			"instance_create() returned EINVALIDPARAMS"},
-		{"non-existent-backend", 10, 4,
+		{ErasureCodeParams{Name: "non-existent-backend", K: 10, M: 4},
 			"unsupported backend \"non-existent-backend\""},
-		{"", 10, 4,
+		{ErasureCodeParams{Name: "", K: 10, M: 4},
 			"unsupported backend \"\""},
-		{"liberasurecode_rs_vand", 20, 20,
+		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: 20, M: 20},
 			"instance_create() returned EINVALIDPARAMS"},
 	}
 	for _, args := range cases {
-		params := ErasureCodeParams{args.name, args.k, args.m, 0}
-		backend, err := InitBackend(params)
+		backend, err := InitBackend(args.params)
 		if err == nil {
 			t.Errorf("Expected error when calling InitBackend(%v)",
-				params)
+				args.params)
 			backend.Close()
 			continue
 		}
 		if err.Error() != args.want {
-			t.Errorf("InitBackend(%q, %v, %v) produced error %q, want %q",
-				args.name, args.k, args.m, err, args.want)
+			t.Errorf("InitBackend(%v) produced error %q, want %q",
+				args.params, err, args.want)
 		}
 		if backend.libec_desc != 0 {
-			t.Errorf("InitBackend(%q, %v, %v) produced backend with descriptor %v, want 0",
-				args.name, args.k, args.m, backend.libec_desc)
+			t.Errorf("InitBackend(%v) produced backend with descriptor %v, want 0",
+				args.params, backend.libec_desc)
 			backend.Close()
 		}
 	}
