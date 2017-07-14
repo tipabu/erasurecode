@@ -10,6 +10,25 @@ var validParams = []ErasureCodeParams{
 	{"liberasurecode_rs_vand", 4, 3, 0},
 	{"liberasurecode_rs_vand", 8, 4, 0},
 	{"liberasurecode_rs_vand", 15, 4, 0},
+	{"isa_l_rs_vand", 2, 1, 0},
+	{"isa_l_rs_vand", 10, 4, 0},
+	{"isa_l_rs_vand", 4, 3, 0},
+	{"isa_l_rs_vand", 8, 4, 0},
+	{"isa_l_rs_vand", 15, 4, 0},
+	{"isa_l_rs_cauchy", 2, 1, 0},
+	{"isa_l_rs_cauchy", 10, 4, 0},
+	{"isa_l_rs_cauchy", 4, 3, 0},
+	{"isa_l_rs_cauchy", 8, 4, 0},
+	{"isa_l_rs_cauchy", 15, 4, 0},
+	{"jerasure_rs_vand", 2, 1, 0},
+	{"jerasure_rs_vand", 10, 4, 0},
+	{"jerasure_rs_vand", 4, 3, 0},
+	{"jerasure_rs_vand", 8, 4, 0},
+	{"jerasure_rs_vand", 15, 4, 0},
+	{"jerasure_rs_cauchy", 2, 1, 0},
+	{"jerasure_rs_cauchy", 10, 4, 0},
+	{"jerasure_rs_cauchy", 4, 3, 0},
+	{"jerasure_rs_cauchy", 8, 4, 0},
 }
 
 var testPatterns = [][]byte{
@@ -39,6 +58,7 @@ func TestInitBackend(t *testing.T) {
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("%q", err)
+			continue
 		}
 		if backend.libec_desc <= 0 {
 			t.Errorf("Expected backend descriptor > 0, got %d", backend.libec_desc)
@@ -93,6 +113,9 @@ func TestInitBackendFailure(t *testing.T) {
 
 func TestEncodeDecode(t *testing.T) {
 	for _, params := range validParams {
+		if !BackendIsAvailable(params.Name) {
+			continue
+		}
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", params, err)
@@ -143,6 +166,9 @@ func TestEncodeDecode(t *testing.T) {
 
 func TestReconstruct(t *testing.T) {
 	for _, params := range validParams {
+		if !BackendIsAvailable(params.Name) {
+			continue
+		}
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", params, err)
@@ -188,6 +214,9 @@ func TestReconstruct(t *testing.T) {
 
 func TestIsInvalid(t *testing.T) {
 	for _, params := range validParams {
+		if !BackendIsAvailable(params.Name) {
+			continue
+		}
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", params, err)
