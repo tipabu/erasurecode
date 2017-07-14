@@ -10,23 +10,28 @@ import "errors"
 import "fmt"
 import "unsafe"
 
+type ErasureCodeParams struct {
+	Name string
+	K    int
+	M    int
+	HD   int
+}
+
 type ErasureCodeBackend struct {
-	Name       string
-	K          int
-	M          int
+	ErasureCodeParams
 	libec_desc C.int
 }
 
-func InitBackend(name string, k int, m int) (ErasureCodeBackend, error) {
-	backend := ErasureCodeBackend{Name: name, K: k, M: m}
-	id, err := nameToId(name)
+func InitBackend(params ErasureCodeParams) (ErasureCodeBackend, error) {
+	backend := ErasureCodeBackend{params, 0}
+	id, err := nameToId(backend.Name)
 	if err != nil {
 		return backend, err
 	}
 	desc := C.liberasurecode_instance_create(id, &C.struct_ec_args{
 		k:  C.int(backend.K),
 		m:  C.int(backend.M),
-		hd: C.int(backend.M),
+		hd: C.int(backend.HD),
 		ct: C.CHKSUM_CRC32,
 	})
 	if desc < 0 {

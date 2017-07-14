@@ -4,12 +4,9 @@ import "bytes"
 import "math/rand"
 import "testing"
 
-var validArgs = []struct {
-	name string
-	k, m int
-}{
-	{"liberasurecode_rs_vand", 2, 1},
-	{"liberasurecode_rs_vand", 10, 4},
+var validParams = []ErasureCodeParams{
+	{"liberasurecode_rs_vand", 2, 1, 0},
+	{"liberasurecode_rs_vand", 10, 4, 0},
 }
 
 var testPatterns = [][]byte{
@@ -35,8 +32,8 @@ func shuf(src [][]byte) [][]byte {
 }
 
 func TestInitBackend(t *testing.T) {
-	for _, args := range validArgs {
-		backend, err := InitBackend(args.name, args.k, args.m)
+	for _, params := range validParams {
+		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("%q", err)
 		}
@@ -71,10 +68,11 @@ func TestInitBackendFailure(t *testing.T) {
 			"instance_create() returned EINVALIDPARAMS"},
 	}
 	for _, args := range cases {
-		backend, err := InitBackend(args.name, args.k, args.m)
+		params := ErasureCodeParams{args.name, args.k, args.m, 0}
+		backend, err := InitBackend(params)
 		if err == nil {
-			t.Errorf("Expected error when calling InitBackend(%q, %v, %v)",
-				args.name, args.k, args.m)
+			t.Errorf("Expected error when calling InitBackend(%v)",
+				params)
 			backend.Close()
 			continue
 		}
@@ -91,17 +89,17 @@ func TestInitBackendFailure(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	for _, args := range validArgs {
-		backend, err := InitBackend(args.name, args.k, args.m)
+	for _, params := range validParams {
+		backend, err := InitBackend(params)
 		if err != nil {
-			t.Errorf("Error creating backend %v: %q", args, err)
+			t.Errorf("Error creating backend %v: %q", params, err)
 			backend.Close()
 			continue
 		}
 		for patternIndex, pattern := range testPatterns {
 			frags, err := backend.Encode(pattern)
 			if err != nil {
-				t.Errorf("Error encoding %v: %q", args, err)
+				t.Errorf("Error encoding %v: %q", params, err)
 			}
 
 			decode := func(frags [][]byte, description string) bool {
@@ -119,10 +117,10 @@ func TestEncodeDecode(t *testing.T) {
 			var good bool
 			good = decode(frags, "all frags")
 			good = good && decode(shuf(frags), "all frags, shuffled")
-			good = good && decode(frags[:args.k], "data frags")
-			good = good && decode(shuf(frags[:args.k]), "shuffled data frags")
-			good = good && decode(frags[args.m:], "with parity frags")
-			good = good && decode(shuf(frags[args.m:]), "shuffled parity frags")
+			good = good && decode(frags[:params.K], "data frags")
+			good = good && decode(shuf(frags[:params.K]), "shuffled data frags")
+			good = good && decode(frags[params.M:], "with parity frags")
+			good = good && decode(shuf(frags[params.M:]), "shuffled parity frags")
 
 			if !good {
 				break
@@ -141,17 +139,17 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func TestReconstruct(t *testing.T) {
-	for _, args := range validArgs {
-		backend, err := InitBackend(args.name, args.k, args.m)
+	for _, params := range validParams {
+		backend, err := InitBackend(params)
 		if err != nil {
-			t.Errorf("Error creating backend %v: %q", args, err)
+			t.Errorf("Error creating backend %v: %q", params, err)
 			backend.Close()
 			continue
 		}
 		for patternIndex, pattern := range testPatterns {
 			frags, err := backend.Encode(pattern)
 			if err != nil {
-				t.Errorf("Error encoding %v: %q", args, err)
+				t.Errorf("Error encoding %v: %q", params, err)
 			}
 
 			reconstruct := func(recon_frags [][]byte, frag_index int, description string) bool {
@@ -167,8 +165,8 @@ func TestReconstruct(t *testing.T) {
 			}
 
 			var good bool
-			good = reconstruct(shuf(frags[:args.k]), args.k+args.m-1, "last frag from data frags")
-			good = good && reconstruct(shuf(frags[args.m:]), 0, "first frag with parity frags")
+			good = reconstruct(shuf(frags[:params.K]), params.K+params.M-1, "last frag from data frags")
+			good = good && reconstruct(shuf(frags[params.M:]), 0, "first frag with parity frags")
 			if !good {
 				break
 			}
@@ -186,17 +184,17 @@ func TestReconstruct(t *testing.T) {
 }
 
 func TestIsInvalid(t *testing.T) {
-	for _, args := range validArgs {
-		backend, err := InitBackend(args.name, args.k, args.m)
+	for _, params := range validParams {
+		backend, err := InitBackend(params)
 		if err != nil {
-			t.Errorf("Error creating backend %v: %q", args, err)
+			t.Errorf("Error creating backend %v: %q", params, err)
 			backend.Close()
 			continue
 		}
 		for patternIndex, pattern := range testPatterns {
 			frags, err := backend.Encode(pattern)
 			if err != nil {
-				t.Errorf("Error encoding %v: %q", args, err)
+				t.Errorf("Error encoding %v: %q", params, err)
 				continue
 			}
 			for index, frag := range frags {
