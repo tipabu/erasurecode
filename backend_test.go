@@ -93,13 +93,13 @@ func TestEncodeDecode(t *testing.T) {
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", params, err)
-			backend.Close()
 			continue
 		}
 		for patternIndex, pattern := range testPatterns {
 			frags, err := backend.Encode(pattern)
 			if err != nil {
 				t.Errorf("Error encoding %v: %q", params, err)
+				break
 			}
 
 			decode := func(frags [][]byte, description string) bool {
