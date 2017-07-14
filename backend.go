@@ -14,6 +14,7 @@ type ErasureCodeParams struct {
 	Name string
 	K    int
 	M    int
+	W    int
 	HD   int
 }
 
@@ -39,6 +40,7 @@ func InitBackend(params ErasureCodeParams) (ErasureCodeBackend, error) {
 	desc := C.liberasurecode_instance_create(id, &C.struct_ec_args{
 		k:  C.int(backend.K),
 		m:  C.int(backend.M),
+		w:  C.int(backend.W),
 		hd: C.int(backend.HD),
 		ct: C.CHKSUM_CRC32,
 	})

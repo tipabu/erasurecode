@@ -29,6 +29,7 @@ var validParams = []ErasureCodeParams{
 	{Name: "jerasure_rs_cauchy", K: 10, M: 4},
 	{Name: "jerasure_rs_cauchy", K: 4, M: 3},
 	{Name: "jerasure_rs_cauchy", K: 8, M: 4},
+	{Name: "jerasure_rs_cauchy", K: 15, M: 4, W: 5},
 }
 
 var testPatterns = [][]byte{
