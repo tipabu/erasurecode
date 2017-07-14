@@ -104,21 +104,29 @@ func TestEncodeDecode(t *testing.T) {
 				t.Errorf("Error encoding %v: %q", args, err)
 			}
 
-			decode := func(frags [][]byte, description string) {
+			decode := func(frags [][]byte, description string) bool {
 				data, err := backend.Decode(frags)
 				if err != nil {
 					t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
+					return false
 				} else if bytes.Compare(data, pattern) != 0 {
 					t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
+					return false
 				}
+				return true
 			}
 
-			decode(frags, "all frags")
-			decode(shuf(frags), "all frags, shuffled")
-			decode(frags[:args.k], "data frags")
-			decode(shuf(frags[:args.k]), "shuffled data frags")
-			decode(frags[args.m:], "with parity frags")
-			decode(shuf(frags[args.m:]), "shuffled parity frags")
+			var good bool
+			good = decode(frags, "all frags")
+			good = good && decode(shuf(frags), "all frags, shuffled")
+			good = good && decode(frags[:args.k], "data frags")
+			good = good && decode(shuf(frags[:args.k]), "shuffled data frags")
+			good = good && decode(frags[args.m:], "with parity frags")
+			good = good && decode(shuf(frags[args.m:]), "shuffled parity frags")
+
+			if !good {
+				break
+			}
 		}
 
 		if _, err := backend.Decode([][]byte{}); err == nil {
@@ -146,17 +154,24 @@ func TestReconstruct(t *testing.T) {
 				t.Errorf("Error encoding %v: %q", args, err)
 			}
 
-			reconstruct := func(recon_frags [][]byte, frag_index int, description string) {
+			reconstruct := func(recon_frags [][]byte, frag_index int, description string) bool {
 				data, err := backend.Reconstruct(recon_frags, frag_index)
 				if err != nil {
 					t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
+					return false
 				} else if bytes.Compare(data, frags[frag_index]) != 0 {
 					t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
+					return false
 				}
+				return true
 			}
 
-			reconstruct(shuf(frags[:args.k]), args.k+args.m-1, "last frag from data frags")
-			reconstruct(shuf(frags[args.m:]), 0, "first frag with parity frags")
+			var good bool
+			good = reconstruct(shuf(frags[:args.k]), args.k+args.m-1, "last frag from data frags")
+			good = good && reconstruct(shuf(frags[args.m:]), 0, "first frag with parity frags")
+			if !good {
+				break
+			}
 		}
 
 		if _, err := backend.Reconstruct([][]byte{}, 0); err == nil {
