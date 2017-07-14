@@ -242,3 +242,29 @@ func TestIsInvalid(t *testing.T) {
 		}
 	}
 }
+
+func TestBackendIsAvailable(t *testing.T) {
+	required_backends := []string{
+		"null",
+		"flat_xor_hd",
+		"liberasurecode_rs_vand",
+	}
+	optional_backends := []string{
+		"isa_l_rs_vand",
+		"isa_l_rs_cauchy",
+		"jerasure_rs_vand",
+		"jerasure_rs_cauchy",
+		"shss",
+		"libphazr",
+	}
+	for _, name := range required_backends {
+		if !BackendIsAvailable(name) {
+			t.Fatalf("%v is not available", name)
+		}
+	}
+	for _, name := range optional_backends {
+		if !BackendIsAvailable(name) {
+			t.Logf("%v is not available", name)
+		}
+	}
+}

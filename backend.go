@@ -22,6 +22,14 @@ type ErasureCodeBackend struct {
 	libec_desc C.int
 }
 
+func BackendIsAvailable(name string) bool {
+	id, err := nameToId(name)
+	if err != nil {
+		return false
+	}
+	return C.liberasurecode_backend_available(id) != 0
+}
+
 func InitBackend(params ErasureCodeParams) (ErasureCodeBackend, error) {
 	backend := ErasureCodeBackend{params, 0}
 	id, err := nameToId(backend.Name)
