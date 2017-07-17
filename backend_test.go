@@ -232,6 +232,8 @@ func TestIsInvalidFragment(t *testing.T) {
 				if backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly invalid for pattern %d", backend, index, patternIndex)
 				}
+				fragCopy := make([]byte, len(frag))
+				copy(fragCopy, frag)
 
 				// corrupt the frag
 				corruptedByte := rand.Intn(len(frag))
@@ -243,7 +245,68 @@ func TestIsInvalidFragment(t *testing.T) {
 				if !backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly valid after inverting byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 				}
+				if corruptedByte < 4 || 8 <= corruptedByte && corruptedByte <= 59 {
+					/** corruption is in metadata; claim we were created by a version of
+					 *  libec that predates metadata checksums. Note that
+					 *  Note that a corrupted fragment size (bytes 4-7) will lead to a
+					 *  segfault when we try to verify the fragment -- there's a reason
+					 *  we added metadata checksums!
+					 */
+					copy(frag[63:67], []byte{9, 1, 1, 0})
+					if 20 <= corruptedByte && corruptedByte <= 53 {
+						/** Corrupted data checksum type or data checksum
+						 *  We may or may not detect this type of error; in particular,
+						 *      - if data checksum type is not in ec_checksum_type_t,
+						 *        it is ignored
+						 *      - if data checksum is mangled, we may still be valid
+						 *        under the "alternative" CRC32; this seems more likely
+						 *        with the byte inversion when the data is short
+						 *  Either way, though, clearing the checksum type should make
+						 *  it pass.
+						 */
+						frag[20] = 0
+						if backend.IsInvalidFragment(frag) {
+							t.Errorf("%v: frag %v unexpectedly invalid after clearing metadata crc and disabling data crc", backend, index)
+						}
+					} else if corruptedByte >= 54 || 0 <= corruptedByte && corruptedByte < 4 {
+						/** Some corruptions of some bytes are still detectable. Since we're
+						 *  inverting the byte, we can detect:
+						 *      - frag index -- bytes 0-3
+						 *      - data checksum type -- byte 20
+						 *      - data checksum mismatch -- byte 54
+						 *      - backend id -- byte 55
+						 *      - backend version -- bytes 56-59
+						 */
+						if !backend.IsInvalidFragment(frag) {
+							t.Errorf("%v: frag %v unexpectedly still valid after clearing metadata crc", backend, index)
+						}
+					} else {
+						if backend.IsInvalidFragment(frag) {
+							t.Errorf("%v: frag %v unexpectedly invalid after clearing metadata crc", backend, index)
+						}
+					}
+				} else if corruptedByte >= 67 {
+					copy(frag[20:25], []byte{1, 0, 0, 0, 0})
+					// And since we've changed the metadata, roll back version as above...
+					copy(frag[63:67], []byte{9, 1, 1, 0})
+					if backend.IsInvalidFragment(frag) {
+						t.Errorf("%v: frag %v unexpectedly invalid after clearing data crc", backend, index)
+						t.FailNow()
+					}
+				}
 				frag[corruptedByte] ^= 0xff
+				copy(frag[63:67], fragCopy[63:67])
+				copy(frag[20:25], fragCopy[20:25])
+
+				if bytes.Compare(frag, fragCopy) != 0 {
+					for i, orig := range fragCopy {
+						if frag[i] != orig {
+							t.Logf("%v != %v at index %v", frag[i], orig, i)
+						}
+					}
+					t.Fatal(corruptedByte, frag, fragCopy)
+				}
+
 				frag[corruptedByte] += 1
 				if !backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly valid after incrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
