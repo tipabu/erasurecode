@@ -54,6 +54,17 @@ func shuf(src [][]byte) [][]byte {
 	return dest
 }
 
+func TestGetVersion(t *testing.T) {
+	v := GetVersion()
+	t.Logf("Using liberasurecode version %s", v)
+	if v.Major != 1 {
+		t.Errorf("Expected major version number 1, not %d", v.Major)
+	}
+	if v.Less(Version{1, 4, 0}) {
+		t.Errorf("liberasurecode_get_version was introduced in 1.4.0; got %v", v)
+	}
+}
+
 func TestInitBackend(t *testing.T) {
 	for _, params := range validParams {
 		if !BackendIsAvailable(params.Name) {

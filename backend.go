@@ -10,6 +10,36 @@ import "errors"
 import "fmt"
 import "unsafe"
 
+type Version struct {
+	Major    uint
+	Minor    uint
+	Revision uint
+}
+
+func (v Version) String() string {
+	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Revision)
+}
+
+func (v Version) Less(other Version) bool {
+	if v.Major < other.Major {
+		return true
+	} else if v.Minor < other.Minor {
+		return true
+	} else if v.Revision < other.Revision {
+		return true
+	}
+	return false
+}
+
+func GetVersion() Version {
+	v := C.liberasurecode_get_version()
+	return Version{
+		Major:    uint(v>>16) & 0xffff,
+		Minor:    uint(v>>8) & 0xff,
+		Revision: uint(v) & 0xff,
+	}
+}
+
 type ErasureCodeParams struct {
 	Name string
 	K    int
