@@ -211,7 +211,7 @@ func TestReconstruct(t *testing.T) {
 	}
 }
 
-func TestIsInvalid(t *testing.T) {
+func TestIsInvalidFragment(t *testing.T) {
 	for _, params := range validParams {
 		if !BackendIsAvailable(params.Name) {
 			continue
