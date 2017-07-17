@@ -229,8 +229,7 @@ func TestIsInvalidFragment(t *testing.T) {
 				continue
 			}
 			for index, frag := range frags {
-				res := backend.IsInvalidFragment(frag)
-				if res {
+				if backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly invalid for pattern %d", backend, index, patternIndex)
 				}
 
@@ -241,24 +240,21 @@ func TestIsInvalidFragment(t *testing.T) {
 					corruptedByte = rand.Intn(len(frag))
 				}
 				frag[corruptedByte] ^= 0xff
-				res = backend.IsInvalidFragment(frag)
-				if !res {
+				if !backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly valid after inverting byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 				}
 				frag[corruptedByte] ^= 0xff
 				frag[corruptedByte] += 1
-				res = backend.IsInvalidFragment(frag)
-				if !res {
+				if !backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly valid after incrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 				}
 				frag[corruptedByte] -= 2
-				res = backend.IsInvalidFragment(frag)
 				if corruptedByte >= 63 && corruptedByte < 67 && frag[corruptedByte] != 0xff {
-					if res {
+					if backend.IsInvalidFragment(frag) {
 						t.Errorf("%v: frag %v unexpectedly invalid after decrementing version byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 					}
 				} else {
-					if !res {
+					if !backend.IsInvalidFragment(frag) {
 						t.Errorf("%v: frag %v unexpectedly valid after decrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 					}
 				}
