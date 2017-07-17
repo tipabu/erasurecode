@@ -56,6 +56,9 @@ func shuf(src [][]byte) [][]byte {
 
 func TestInitBackend(t *testing.T) {
 	for _, params := range validParams {
+		if !BackendIsAvailable(params.Name) {
+			continue
+		}
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("%q", err)
