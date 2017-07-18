@@ -56,7 +56,7 @@ func shuf(src [][]byte) [][]byte {
 
 func TestGetVersion(t *testing.T) {
 	v := GetVersion()
-	t.Logf("Using liberasurecode version %s", v)
+	t.Logf("INFO: Using liberasurecode version %s", v)
 	if v.Major != 1 {
 		t.Errorf("Expected major version number 1, not %d", v.Major)
 	}
@@ -365,7 +365,7 @@ func TestBackendIsAvailable(t *testing.T) {
 	}
 	for _, name := range optional_backends {
 		if !BackendIsAvailable(name) {
-			t.Logf("%v is not available", name)
+			t.Logf("INFO: backend not available: %v", name)
 		}
 	}
 }
