@@ -67,10 +67,13 @@ func TestGetVersion(t *testing.T) {
 
 func TestInitBackend(t *testing.T) {
 	for _, params := range validParams {
+		backend, err := InitBackend(params)
 		if !BackendIsAvailable(params.Name) {
+			if err == nil {
+				t.Errorf("Expected EBACKENDNOTAVAIL")
+			}
 			continue
 		}
-		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("%q", err)
 			continue
