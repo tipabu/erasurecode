@@ -106,16 +106,14 @@ func (backend *ErasureCodeBackend) Encode(data []byte) ([][]byte, error) {
 	var parity_frags **C.char
 	var frag_len C.uint64_t
 	c_data := C.CString(string(data))
-	defer C.free(unsafe.Pointer(c_data))
 	rc := C.liberasurecode_encode(
 		backend.libec_desc, c_data, C.uint64_t(len(data)),
 		&data_frags, &parity_frags, &frag_len)
 	if rc != 0 {
+		C.free(unsafe.Pointer(c_data))
 		return nil, errors.New(fmt.Sprintf(
 			"encode() returned %v", errToName(-rc)))
 	}
-	defer C.liberasurecode_encode_cleanup(
-		backend.libec_desc, data_frags, parity_frags)
 	result := make([][]byte, backend.K+backend.M)
 	for i := 0; i < backend.K; i++ {
 		result[i] = bytesFromCharArray(data_frags, i, frag_len)
@@ -123,6 +121,9 @@ func (backend *ErasureCodeBackend) Encode(data []byte) ([][]byte, error) {
 	for i := 0; i < backend.M; i++ {
 		result[i+backend.K] = bytesFromCharArray(parity_frags, i, frag_len)
 	}
+	C.free(unsafe.Pointer(c_data))
+	C.liberasurecode_encode_cleanup(
+		backend.libec_desc, data_frags, parity_frags)
 	return result, nil
 }
 
@@ -133,22 +134,27 @@ func (backend *ErasureCodeBackend) Decode(frags [][]byte) ([]byte, error) {
 		return nil, errors.New("decoding requires at least one fragment")
 	}
 	c_frags := (**C.char)(C.malloc(C.size_t(int(unsafe.Sizeof(data)) * len(frags))))
-	defer C.free(unsafe.Pointer(c_frags))
 	base := uintptr(unsafe.Pointer(c_frags))
 	for index, frag := range frags {
 		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
 		*ptr = C.CString(string(frag))
-		defer C.free(unsafe.Pointer(*ptr))
 	}
 	rc := C.liberasurecode_decode(
 		backend.libec_desc, c_frags, C.int(len(frags)),
 		C.uint64_t(len(frags[0])), C.int(1),
 		&data, &data_len)
 	if rc != 0 {
+		base := uintptr(unsafe.Pointer(c_frags))
+		for index, _ := range frags {
+			ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
+			C.free(unsafe.Pointer(*ptr))
+		}
+		C.free(unsafe.Pointer(c_frags))
 		return nil, errors.New(fmt.Sprintf(
 			"decode() returned %v", errToName(-rc)))
 	}
-	defer C.liberasurecode_decode_cleanup(backend.libec_desc, data)
+	C.free(unsafe.Pointer(c_frags))
+	C.liberasurecode_decode_cleanup(backend.libec_desc, data)
 	return C.GoBytes(unsafe.Pointer(data), C.int(data_len)), nil
 }
 
@@ -159,27 +165,38 @@ func (backend *ErasureCodeBackend) Reconstruct(frags [][]byte, frag_index int) (
 	}
 	frag_len := len(frags[0])
 	data = (*C.char)(C.malloc(C.size_t(int(unsafe.Sizeof(*data)) * frag_len)))
-	defer C.free(unsafe.Pointer(data))
 	c_frags := (**C.char)(C.malloc(C.size_t(int(unsafe.Sizeof(data)) * len(frags))))
-	defer C.free(unsafe.Pointer(c_frags))
 	base := uintptr(unsafe.Pointer(c_frags))
 	for index, frag := range frags {
 		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
 		*ptr = C.CString(string(frag))
-		defer C.free(unsafe.Pointer(*ptr))
 	}
 
 	if rc := C.liberasurecode_reconstruct_fragment(
 		backend.libec_desc, c_frags, C.int(len(frags)),
 		C.uint64_t(len(frags[0])), C.int(frag_index), data); rc != 0 {
+		for index, _ := range frags {
+			ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
+			C.free(unsafe.Pointer(*ptr))
+		}
+		C.free(unsafe.Pointer(c_frags))
+		C.free(unsafe.Pointer(data))
 		return nil, errors.New(fmt.Sprintf(
 			"reconstruct_fragment() returned %v", errToName(-rc)))
 	}
-	return C.GoBytes(unsafe.Pointer(data), C.int(len(frags[0]))), nil
+	for index, _ := range frags {
+		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
+		C.free(unsafe.Pointer(*ptr))
+	}
+	C.free(unsafe.Pointer(c_frags))
+	res := C.GoBytes(unsafe.Pointer(data), C.int(len(frags[0])))
+	C.free(unsafe.Pointer(data))
+	return res, nil
 }
 
 func (backend *ErasureCodeBackend) IsInvalidFragment(frag []byte) bool {
 	c_data := C.CString(string(frag))
-	defer C.free(unsafe.Pointer(c_data))
-	return 1 == C.is_invalid_fragment(backend.libec_desc, c_data)
+	res := 1 == C.is_invalid_fragment(backend.libec_desc, c_data)
+	C.free(unsafe.Pointer(c_data))
+	return res
 }
