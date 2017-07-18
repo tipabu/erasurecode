@@ -106,6 +106,8 @@ func TestInitBackendFailure(t *testing.T) {
 			"unsupported backend \"\""},
 		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: 20, M: 20},
 			"instance_create() returned EINVALIDPARAMS"},
+		{ErasureCodeParams{Name: "flat_xor_hd", K: 4, M: 4, HD: 3},
+			"instance_create() returned EBACKENDINITERR"},
 	}
 	for _, args := range cases {
 		backend, err := InitBackend(args.params)
