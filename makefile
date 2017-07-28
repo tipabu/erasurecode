@@ -4,20 +4,30 @@ BUILDDIR=$(PWD)/build
 
 .PHONY: default test
 
-default: $(BUILDDIR)/lib/liberasurecode-1.so
-	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig go build
+default: $(BUILDDIR)/lib/liberasurecode-1.so $(BUILDDIR)/lib/libisal.so
+	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
+	go build
 
-test: $(BUILDDIR)/lib/liberasurecode-1.so
-	DYLIB_LIBRARY_PATH=$(BUILDDIR)/lib LD_LIBRARY_PATH=$(BUILDDIR)/lib PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig go test
+test: $(BUILDDIR)/lib/liberasurecode-1.so $(BUILDDIR)/lib/libisal.so
+	DYLIB_LIBRARY_PATH=$(BUILDDIR)/lib \
+	LD_LIBRARY_PATH=$(BUILDDIR)/lib \
+	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
+	go test -v
+
+$(ISALSRC)/autogen.sh:
+	git clone https://github.com/01org/isa-l.git $(ISALSRC)
 
 $(LIBECSRC)/autogen.sh:
 	git clone https://github.com/tipabu/liberasurecode.git $(LIBECSRC)
 
-$(LIBECSRC)/configure: $(LIBECSRC)/autogen.sh
-	cd $(LIBECSRC) && ./autogen.sh
+$(PWD)/deps/%/configure: $(PWD)/deps/%/autogen.sh
+	cd $(@D) && ./autogen.sh
 
-$(LIBECSRC)/Makefile: $(LIBECSRC)/configure
-	cd $(LIBECSRC) && ./configure --prefix=$(BUILDDIR)
+$(PWD)/deps/%/Makefile: $(PWD)/deps/%/configure
+	cd $(@D) && ./configure --prefix=$(BUILDDIR)
 
 $(BUILDDIR)/lib/liberasurecode-1.so: $(LIBECSRC)/Makefile
 	cd $(LIBECSRC) && make install
+
+$(BUILDDIR)/lib/libisal.so: $(ISALSRC)/Makefile
+	cd $(ISALSRC) && make install
