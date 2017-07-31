@@ -4,11 +4,11 @@ BUILDDIR=$(PWD)/build
 
 .PHONY: default test
 
-default: $(BUILDDIR)/lib/liberasurecode-1.so $(BUILDDIR)/lib/libisal.so
+default: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
 	go build
 
-test: $(BUILDDIR)/lib/liberasurecode-1.so $(BUILDDIR)/lib/libisal.so
+test: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a
 	DYLIB_LIBRARY_PATH=$(BUILDDIR)/lib \
 	LD_LIBRARY_PATH=$(BUILDDIR)/lib \
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
@@ -26,8 +26,9 @@ $(PWD)/deps/%/configure: $(PWD)/deps/%/autogen.sh
 $(PWD)/deps/%/Makefile: $(PWD)/deps/%/configure
 	cd $(@D) && ./configure --prefix=$(BUILDDIR)
 
-$(BUILDDIR)/lib/liberasurecode-1.so: $(LIBECSRC)/Makefile
+
+$(BUILDDIR)/lib/liberasurecode.a: $(LIBECSRC)/Makefile
 	cd $(LIBECSRC) && make install
 
-$(BUILDDIR)/lib/libisal.so: $(ISALSRC)/Makefile
+$(BUILDDIR)/lib/libisal.a: $(ISALSRC)/Makefile
 	cd $(ISALSRC) && make install
