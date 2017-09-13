@@ -25,7 +25,7 @@ $(ISALSRC)/autogen.sh:
 	git clone https://github.com/01org/isa-l.git $(ISALSRC)
 
 $(LIBECSRC)/autogen.sh:
-	git clone https://github.com/tipabu/liberasurecode.git $(LIBECSRC)
+	git clone https://github.com/openstack/liberasurecode.git $(LIBECSRC)
 
 $(JERASURESRC)/configure.ac:
 	git clone http://lab.jerasure.org/jerasure/jerasure.git $(JERASURESRC)
