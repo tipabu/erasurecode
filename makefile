@@ -1,10 +1,12 @@
-LIBECSRC=$(PWD)/deps/liberasurecode
-ISALSRC=$(PWD)/deps/isa-l
-GFCOMPLETESRC=$(PWD)/deps/gf-complete
-JERASURESRC=$(PWD)/deps/jerasure
+DEPDIR=$(PWD)/deps
 BUILDDIR=$(PWD)/build
 
-.PHONY: default test
+LIBECSRC=$(DEPDIR)/liberasurecode
+ISALSRC=$(DEPDIR)/isa-l
+GFCOMPLETESRC=$(DEPDIR)/gf-complete
+JERASURESRC=$(DEPDIR)/jerasure
+
+.PHONY: default test clean
 
 default: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib/libJerasure.la
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
@@ -15,6 +17,9 @@ test: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib
 	LD_LIBRARY_PATH=$(BUILDDIR)/lib \
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
 	go test -v
+
+clean:
+	rm -rf $(BUILDDIR) $(DEPDIR)
 
 $(ISALSRC)/autogen.sh:
 	git clone https://github.com/01org/isa-l.git $(ISALSRC)
