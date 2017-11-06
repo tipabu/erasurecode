@@ -4,11 +4,16 @@ package erasurecode
 #cgo pkg-config: erasurecode-1
 #include <stdlib.h>
 #include <liberasurecode/erasurecode.h>
+// shim to make dereferencing frags easier
+void * strArrayItem(char ** arr, int idx) { return arr[idx]; }
 */
 import "C"
-import "errors"
-import "fmt"
-import "unsafe"
+
+import (
+	"errors"
+	"fmt"
+	"unsafe"
+)
 
 type Version struct {
 	Major    uint
@@ -94,23 +99,14 @@ func (backend *ErasureCodeBackend) Close() error {
 	return nil
 }
 
-func bytesFromCharArray(ptr **C.char, index int, read_length C.uint64_t) []byte {
-	base := uintptr(unsafe.Pointer(ptr))
-	offset := uintptr(index) * unsafe.Sizeof(*ptr)
-	item := *(*unsafe.Pointer)(unsafe.Pointer(base + offset))
-	return C.GoBytes(item, C.int(read_length))
-}
-
 func (backend *ErasureCodeBackend) Encode(data []byte) ([][]byte, error) {
 	var data_frags **C.char
 	var parity_frags **C.char
 	var frag_len C.uint64_t
-	c_data := C.CString(string(data))
-	defer C.free(unsafe.Pointer(c_data))
-	rc := C.liberasurecode_encode(
-		backend.libec_desc, c_data, C.uint64_t(len(data)),
-		&data_frags, &parity_frags, &frag_len)
-	if rc != 0 {
+	p_data := (*C.char)(unsafe.Pointer(&data[0]))
+	if rc := C.liberasurecode_encode(
+		backend.libec_desc, p_data, C.uint64_t(len(data)),
+		&data_frags, &parity_frags, &frag_len); rc != 0 {
 		return nil, errors.New(fmt.Sprintf(
 			"encode() returned %v", errToName(-rc)))
 	}
@@ -118,10 +114,10 @@ func (backend *ErasureCodeBackend) Encode(data []byte) ([][]byte, error) {
 		backend.libec_desc, data_frags, parity_frags)
 	result := make([][]byte, backend.K+backend.M)
 	for i := 0; i < backend.K; i++ {
-		result[i] = bytesFromCharArray(data_frags, i, frag_len)
+		result[i] = C.GoBytes(C.strArrayItem(data_frags, C.int(i)), C.int(frag_len))
 	}
 	for i := 0; i < backend.M; i++ {
-		result[i+backend.K] = bytesFromCharArray(parity_frags, i, frag_len)
+		result[i+backend.K] = C.GoBytes(C.strArrayItem(parity_frags, C.int(i)), C.int(frag_len))
 	}
 	return result, nil
 }
@@ -132,19 +128,19 @@ func (backend *ErasureCodeBackend) Decode(frags [][]byte) ([]byte, error) {
 	if len(frags) == 0 {
 		return nil, errors.New("decoding requires at least one fragment")
 	}
-	c_frags := (**C.char)(C.malloc(C.size_t(int(unsafe.Sizeof(data)) * len(frags))))
+
+	c_frags := (**C.char)(C.calloc(C.size_t(len(frags)), C.size_t(int(unsafe.Sizeof(data)))))
 	defer C.free(unsafe.Pointer(c_frags))
 	base := uintptr(unsafe.Pointer(c_frags))
 	for index, frag := range frags {
 		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
-		*ptr = C.CString(string(frag))
-		defer C.free(unsafe.Pointer(*ptr))
+		*ptr = (*C.char)(unsafe.Pointer(&frag[0]))
 	}
-	rc := C.liberasurecode_decode(
+
+	if rc := C.liberasurecode_decode(
 		backend.libec_desc, c_frags, C.int(len(frags)),
 		C.uint64_t(len(frags[0])), C.int(1),
-		&data, &data_len)
-	if rc != 0 {
+		&data, &data_len); rc != 0 {
 		return nil, errors.New(fmt.Sprintf(
 			"decode() returned %v", errToName(-rc)))
 	}
@@ -153,33 +149,31 @@ func (backend *ErasureCodeBackend) Decode(frags [][]byte) ([]byte, error) {
 }
 
 func (backend *ErasureCodeBackend) Reconstruct(frags [][]byte, frag_index int) ([]byte, error) {
-	var data *C.char
 	if len(frags) == 0 {
 		return nil, errors.New("reconstruction requires at least one fragment")
 	}
 	frag_len := len(frags[0])
-	data = (*C.char)(C.malloc(C.size_t(int(unsafe.Sizeof(*data)) * frag_len)))
-	defer C.free(unsafe.Pointer(data))
-	c_frags := (**C.char)(C.malloc(C.size_t(int(unsafe.Sizeof(data)) * len(frags))))
+	data := make([]byte, frag_len)
+	p_data := (*C.char)(unsafe.Pointer(&data[0]))
+
+	c_frags := (**C.char)(C.calloc(C.size_t(len(frags)), C.size_t(int(unsafe.Sizeof(p_data)))))
 	defer C.free(unsafe.Pointer(c_frags))
 	base := uintptr(unsafe.Pointer(c_frags))
 	for index, frag := range frags {
 		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
-		*ptr = C.CString(string(frag))
-		defer C.free(unsafe.Pointer(*ptr))
+		*ptr = (*C.char)(unsafe.Pointer(&frag[0]))
 	}
 
 	if rc := C.liberasurecode_reconstruct_fragment(
 		backend.libec_desc, c_frags, C.int(len(frags)),
-		C.uint64_t(len(frags[0])), C.int(frag_index), data); rc != 0 {
+		C.uint64_t(len(frags[0])), C.int(frag_index), p_data); rc != 0 {
 		return nil, errors.New(fmt.Sprintf(
 			"reconstruct_fragment() returned %v", errToName(-rc)))
 	}
-	return C.GoBytes(unsafe.Pointer(data), C.int(len(frags[0]))), nil
+	return data, nil
 }
 
 func (backend *ErasureCodeBackend) IsInvalidFragment(frag []byte) bool {
-	c_data := C.CString(string(frag))
-	defer C.free(unsafe.Pointer(c_data))
-	return 1 == C.is_invalid_fragment(backend.libec_desc, c_data)
+	p_data := (*C.char)(unsafe.Pointer(&frag[0]))
+	return 1 == C.is_invalid_fragment(backend.libec_desc, p_data)
 }
