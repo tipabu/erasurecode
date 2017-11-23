@@ -45,6 +45,27 @@ func GetVersion() Version {
 	}
 }
 
+var KnownBackends = [...]string{
+	"null",
+	"jerasure_rs_vand",
+	"jerasure_rs_cauchy",
+	"flat_xor_hd",
+	"isa_l_rs_vand",
+	"shss",
+	"liberasurecode_rs_vand",
+	"isa_l_rs_cauchy",
+	"libphazr",
+}
+
+func AvailableBackends() (avail []string) {
+	for _, name := range KnownBackends {
+		if BackendIsAvailable(name) {
+			avail = append(avail, name)
+		}
+	}
+	return
+}
+
 type ErasureCodeParams struct {
 	Name string
 	K    int

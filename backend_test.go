@@ -374,3 +374,14 @@ func TestBackendIsAvailable(t *testing.T) {
 		}
 	}
 }
+
+func TestAvailableBackends(t *testing.T) {
+	for _, name := range AvailableBackends() {
+		backend, err := InitBackend(ErasureCodeParams{Name: name, K: 3, M: 3, HD: 3})
+		if err != nil {
+			t.Errorf("Error creating backend %v: %q", name, err)
+		}
+		backend.Close()
+	}
+	t.Logf("INFO: found %v/%v available backends", len(AvailableBackends()), len(KnownBackends))
+}
