@@ -6,7 +6,7 @@ ISALSRC=$(DEPDIR)/isa-l
 GFCOMPLETESRC=$(DEPDIR)/gf-complete
 JERASURESRC=$(DEPDIR)/jerasure
 
-.PHONY: default test clean
+.PHONY: default test clean pretty
 
 default: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib/libJerasure.la
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
@@ -20,6 +20,9 @@ test: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib
 
 clean:
 	rm -rf $(BUILDDIR) $(DEPDIR)
+
+pretty:
+	find $(PWD) -name '*.go' | xargs gofmt -l -w
 
 $(ISALSRC)/autogen.sh:
 	git clone https://github.com/01org/isa-l.git $(ISALSRC)
