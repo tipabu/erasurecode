@@ -146,6 +146,29 @@ func TestEncodeDecode(t *testing.T) {
 				break
 			}
 
+			expectedVersion := GetVersion()
+			for index, frag := range frags {
+				info := GetFragmentInfo(frag)
+				if info.Index != index {
+					t.Errorf("Expected frag %v to have index %v; got %v", index, index, info.Index)
+				}
+				if info.Size != len(frag)-80 { // 80 == sizeof (struct fragment_header_s)
+					t.Errorf("Expected frag %v to have size %v; got %v", index, len(frag)-80, info.Size)
+				}
+				if info.OrigDataSize != uint64(len(pattern)) {
+					t.Errorf("Expected frag %v to have orig_data_size %v; got %v", index, len(pattern), info.OrigDataSize)
+				}
+				if info.BackendName != params.Name {
+					t.Errorf("Expected frag %v to have backend %v; got %v", index, params.Name, info.BackendName)
+				}
+				if info.ErasureCodeVersion != expectedVersion {
+					t.Errorf("Expected frag %v to have EC version %v; got %v", index, expectedVersion, info.ErasureCodeVersion)
+				}
+				if !info.IsValid {
+					t.Errorf("Expected frag %v to be valid", index)
+				}
+			}
+
 			decode := func(frags [][]byte, description string) bool {
 				data, err := backend.Decode(frags)
 				if err != nil {

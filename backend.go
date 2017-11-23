@@ -4,8 +4,14 @@ package erasurecode
 #cgo pkg-config: erasurecode-1
 #include <stdlib.h>
 #include <liberasurecode/erasurecode.h>
+#include <liberasurecode/erasurecode_helpers_ext.h>
 // shim to make dereferencing frags easier
 void * strArrayItem(char ** arr, int idx) { return arr[idx]; }
+// shims because the fragment headers use misaligned fields
+uint64_t getOrigDataSize(fragment_header_t *header) { return header->meta.orig_data_size; }
+uint32_t getBackendVersion(fragment_header_t *header) { return header->meta.backend_version; }
+uint32_t getECVersion(fragment_header_t *header) { return header->libec_version;
+}
 */
 import "C"
 
@@ -37,7 +43,9 @@ func (v Version) Less(other Version) bool {
 }
 
 func GetVersion() Version {
-	v := C.liberasurecode_get_version()
+	return makeVersion(C.liberasurecode_get_version())
+}
+func makeVersion(v C.uint32_t) Version {
 	return Version{
 		Major:    uint(v>>16) & 0xffff,
 		Minor:    uint(v>>8) & 0xff,
@@ -197,4 +205,31 @@ func (backend *ErasureCodeBackend) Reconstruct(frags [][]byte, frag_index int) (
 func (backend *ErasureCodeBackend) IsInvalidFragment(frag []byte) bool {
 	p_data := (*C.char)(unsafe.Pointer(&frag[0]))
 	return 1 == C.is_invalid_fragment(backend.libec_desc, p_data)
+}
+
+type FragmentInfo struct {
+	Index               int
+	Size                int
+	BackendMetadataSize int
+	OrigDataSize        uint64
+	BackendId           C.ec_backend_id_t
+	BackendName         string
+	BackendVersion      Version
+	ErasureCodeVersion  Version
+	IsValid             bool
+}
+
+func GetFragmentInfo(frag []byte) FragmentInfo {
+	header := *(*C.struct_fragment_header_s)(unsafe.Pointer(&frag[0]))
+	return FragmentInfo{
+		Index:               int(header.meta.idx),
+		Size:                int(header.meta.size),
+		BackendMetadataSize: int(header.meta.frag_backend_metadata_size),
+		OrigDataSize:        uint64(C.getOrigDataSize(&header)),
+		BackendId:           C.ec_backend_id_t(header.meta.backend_id),
+		BackendName:         idToName(C.ec_backend_id_t(header.meta.backend_id)),
+		BackendVersion:      makeVersion(C.getBackendVersion(&header)),
+		ErasureCodeVersion:  makeVersion(C.getECVersion(&header)),
+		IsValid:             C.is_invalid_fragment_header(&header) == 0,
+	}
 }

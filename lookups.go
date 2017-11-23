@@ -6,7 +6,6 @@ package erasurecode
 #include <liberasurecode/erasurecode.h>
 */
 import "C"
-import "errors"
 import "fmt"
 
 func nameToId(name string) (C.ec_backend_id_t, error) {
@@ -30,7 +29,32 @@ func nameToId(name string) (C.ec_backend_id_t, error) {
 	case "libphazr":
 		return C.EC_BACKEND_LIBPHAZR, nil
 	default:
-		return 0, errors.New(fmt.Sprintf("unsupported backend %q", name))
+		return 0, fmt.Errorf("unsupported backend %q", name)
+	}
+}
+
+func idToName(id C.ec_backend_id_t) string {
+	switch id {
+	case C.EC_BACKEND_NULL:
+		return "null"
+	case C.EC_BACKEND_JERASURE_RS_VAND:
+		return "jerasure_rs_vand"
+	case C.EC_BACKEND_JERASURE_RS_CAUCHY:
+		return "jerasure_rs_cauchy"
+	case C.EC_BACKEND_FLAT_XOR_HD:
+		return "flat_xor_hd"
+	case C.EC_BACKEND_ISA_L_RS_VAND:
+		return "isa_l_rs_vand"
+	case C.EC_BACKEND_SHSS:
+		return "shss"
+	case C.EC_BACKEND_LIBERASURECODE_RS_VAND:
+		return "liberasurecode_rs_vand"
+	case C.EC_BACKEND_ISA_L_RS_CAUCHY:
+		return "isa_l_rs_cauchy"
+	case C.EC_BACKEND_LIBPHAZR:
+		return "libphazr"
+	default:
+		return fmt.Sprintf("<unknown backend id %v>", id)
 	}
 }
 
