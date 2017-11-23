@@ -18,11 +18,15 @@ test: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
 	go test -v
 
-cmds: ec-split
+cmds: ec-split ec-info
 
 ec-split: $(PWD)/cmd/ec-split/main.go $(PWD)/backend.go $(PWD)/streaming.go
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
 	go build github.com/tipabu/erasurecode/cmd/ec-split
+
+ec-info: $(PWD)/cmd/ec-info/main.go $(PWD)/backend.go $(PWD)/streaming.go
+	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
+	go build github.com/tipabu/erasurecode/cmd/ec-info
 
 clean:
 	rm -rf $(BUILDDIR) $(DEPDIR)

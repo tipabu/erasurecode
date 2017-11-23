@@ -16,3 +16,4 @@
 deps/
 build/
 /ec-split
+/ec-info
