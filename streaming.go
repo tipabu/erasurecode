@@ -66,3 +66,25 @@ func (backend *ErasureCodeBackend) GetFileWriter(prefix string, perm os.FileMode
 	}
 	return ECWriter{backend, writers}, nil
 }
+
+func ReadFragment(reader io.Reader) ([]byte, error) {
+	header := make([]byte, C.sizeof_struct_fragment_header_s)
+	n, err := io.ReadFull(reader, header)
+	if err != nil {
+		return header[:n], err
+	}
+	info := GetFragmentInfo(header)
+
+	if !info.IsValid {
+		return header, fmt.Errorf("Metadata checksum failed")
+	}
+
+	frag := make([]byte, len(header)+info.Size)
+	copy(frag, header)
+	n, err = io.ReadFull(reader, frag[n:])
+	if err != nil {
+		return frag[:len(header)+n], err
+	}
+
+	return frag, nil
+}

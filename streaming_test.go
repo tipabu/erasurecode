@@ -2,6 +2,7 @@ package erasurecode
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"testing"
 )
@@ -17,7 +18,7 @@ func tempDir() string {
 	return dir
 }
 
-func TestWriter(t *testing.T) {
+func TestWriting(t *testing.T) {
 	base := tempDir()
 	defer os.RemoveAll(base)
 
@@ -68,6 +69,30 @@ func TestWriter(t *testing.T) {
 			firstSize = info.Size()
 		} else if info.Size() != firstSize {
 			t.Errorf("%v: Expected all fragments to be the same size (%v), but got %v", fragPath, firstSize, info.Size())
+		}
+
+		fd, err := os.Open(fragPath)
+		if err != nil {
+			t.Errorf("%v: %v", fragPath, err)
+			continue
+		}
+		defer fd.Close()
+		frag, err := ReadFragment(fd)
+		if err != nil {
+			t.Errorf("%v: %v", fragPath, err)
+			continue
+		}
+
+		// Only wrote the one frag
+		junkData, err := ReadFragment(fd)
+		if err != io.EOF {
+			t.Errorf("%v: Expected EOF, got %v (and data %v)", fragPath, err, junkData)
+			continue
+		}
+
+		fragInfo := GetFragmentInfo(frag)
+		if !fragInfo.IsValid {
+			t.Errorf("%v: Expected fragment to be valid", fragPath)
 		}
 	}
 
