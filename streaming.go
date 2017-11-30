@@ -17,6 +17,12 @@ type ECWriter struct {
 	Writers []io.WriteCloser
 }
 
+type ECReader struct {
+	Backend *ErasureCodeBackend
+	Readers []io.ReadCloser
+	buffer  []byte
+}
+
 func getWriters(prefix string, n uint8, perm os.FileMode) ([]io.WriteCloser, error) {
 	var i, j uint8
 	writers := make([]io.WriteCloser, n)
@@ -34,6 +40,24 @@ func getWriters(prefix string, n uint8, perm os.FileMode) ([]io.WriteCloser, err
 		writers[i] = file
 	}
 	return writers, nil
+}
+
+func getReaders(prefix string, n uint8) ([]io.ReadCloser, error) {
+	var i, j uint8
+	readers := make([]io.ReadCloser, n)
+	for i = 0; i < n; i++ {
+		file, err := os.Open(fmt.Sprintf("%s#%d", prefix, i))
+		if err != nil {
+			// Clean up the readers we *did* open
+			for j = 0; i < j; j++ {
+				// Ignoring any errors allong the way
+				readers[i].Close()
+			}
+			return nil, err
+		}
+		readers[i] = file
+	}
+	return readers, nil
 }
 
 func (shim ECWriter) Write(p []byte) (int, error) {
@@ -56,6 +80,45 @@ func (shim ECWriter) Close() error {
 			firstErr = err
 		}
 	}
+	return firstErr
+}
+
+func (shim ECReader) Read(p []byte) (int, error) {
+	return 0, fmt.Errorf("Not implemented")
+	n := copy(p, shim.buffer)
+	shim.buffer = shim.buffer[n:]
+	p = p[n:]
+	if len(p) == 0 {
+		return n, nil
+	}
+
+	// TODO: This shit needs a lot of work
+
+	frags := make([][]byte, len(shim.Readers))
+	// Read one fragment header from each stream
+	// Check that they all agree on how big the fragments should be
+	// Read the rest of the fragment from each stream
+	data, err := shim.Backend.Decode(frags)
+	shim.buffer = data
+	if err != nil {
+		return 0, err
+	}
+	for i, reader := range shim.Readers {
+		// TODO: check for errors
+		reader.Read(frags[i])
+	}
+	return len(p), nil
+}
+
+func (shim ECReader) Close() error {
+	var firstErr error
+	for _, reader := range shim.Readers {
+		err := reader.Close()
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	shim.buffer = nil
 	return firstErr
 }
 
