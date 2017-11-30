@@ -6,9 +6,9 @@ ISALSRC=$(DEPDIR)/isa-l
 GFCOMPLETESRC=$(DEPDIR)/gf-complete
 JERASURESRC=$(DEPDIR)/jerasure
 
-.PHONY: default test clean pretty
+.PHONY: default test clean pretty cmds
 
-default: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib/libJerasure.la
+default: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib/libJerasure.la cmds
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
 	go build
 
@@ -17,6 +17,12 @@ test: $(BUILDDIR)/lib/liberasurecode.a $(BUILDDIR)/lib/libisal.a $(BUILDDIR)/lib
 	LD_LIBRARY_PATH=$(BUILDDIR)/lib \
 	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
 	go test -v
+
+cmds: ec-split
+
+ec-split: $(PWD)/cmd/ec-split/main.go $(PWD)/backend.go $(PWD)/streaming.go
+	PKG_CONFIG_PATH=$(BUILDDIR)/lib/pkgconfig \
+	go build github.com/tipabu/erasurecode/cmd/ec-split
 
 clean:
 	rm -rf $(BUILDDIR) $(DEPDIR)
