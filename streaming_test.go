@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 )
 
 func tempDir() string {
-	base := os.TempDir()
-	dir := base + "erasurecode_test/" // TODO: add random suffix
+	base := strings.TrimRight(os.TempDir(), "/")
+	dir := base + "/erasurecode_test/" // TODO: add random suffix
 	fmt.Println(dir)
 	err := os.MkdirAll(dir, 0700)
 	if err != nil {

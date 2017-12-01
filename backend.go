@@ -8,10 +8,10 @@ package erasurecode
 // shim to make dereferencing frags easier
 void * strArrayItem(char ** arr, int idx) { return arr[idx]; }
 // shims because the fragment headers use misaligned fields
-uint64_t getOrigDataSize(fragment_header_t *header) { return header->meta.orig_data_size; }
-uint32_t getBackendVersion(fragment_header_t *header) { return header->meta.backend_version; }
-uint32_t getECVersion(fragment_header_t *header) { return header->libec_version;
-}
+uint64_t getOrigDataSize(struct fragment_header_s *header) { return header->meta.orig_data_size; }
+uint32_t getBackendVersion(struct fragment_header_s *header) { return header->meta.backend_version; }
+ec_backend_id_t getBackendId(struct fragment_header_s *header) { return header->meta.backend_id; }
+uint32_t getECVersion(struct fragment_header_s *header) { return header->libec_version; }
 */
 import "C"
 
@@ -221,15 +221,16 @@ type FragmentInfo struct {
 
 func GetFragmentInfo(frag []byte) FragmentInfo {
 	header := *(*C.struct_fragment_header_s)(unsafe.Pointer(&frag[0]))
+	backendId := C.getBackendId(&header)
 	return FragmentInfo{
 		Index:               int(header.meta.idx),
 		Size:                int(header.meta.size),
 		BackendMetadataSize: int(header.meta.frag_backend_metadata_size),
 		OrigDataSize:        uint64(C.getOrigDataSize(&header)),
-		BackendId:           C.ec_backend_id_t(header.meta.backend_id),
-		BackendName:         idToName(C.ec_backend_id_t(header.meta.backend_id)),
+		BackendId:           backendId,
+		BackendName:         idToName(backendId),
 		BackendVersion:      makeVersion(C.getBackendVersion(&header)),
 		ErasureCodeVersion:  makeVersion(C.getECVersion(&header)),
-		IsValid:             C.is_invalid_fragment_header(&header) == 0,
+		IsValid:             C.is_invalid_fragment_header((*C.fragment_header_t)(&header)) == 0,
 	}
 }
