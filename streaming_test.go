@@ -11,7 +11,6 @@ import (
 func tempDir() string {
 	base := strings.TrimRight(os.TempDir(), "/")
 	dir := base + "/erasurecode_test/" // TODO: add random suffix
-	fmt.Println(dir)
 	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		panic(err)
@@ -24,7 +23,6 @@ func TestWriting(t *testing.T) {
 	defer os.RemoveAll(base)
 
 	params := validParams[0]
-	pattern := testPatterns[0]
 	backend, err := InitBackend(params)
 	if err != nil {
 		t.Errorf("Error creating backend %v: %q", params, err)
@@ -53,48 +51,56 @@ func TestWriting(t *testing.T) {
 		}
 	}
 
-	writer.Write(pattern)
-	var firstSize int64
-	for index := 0; index < params.K+params.M; index++ {
-		fragPath := fmt.Sprintf("%stest_frags#%d", base, index)
-		info, err := os.Stat(fragPath)
-		if err != nil {
-			t.Errorf("Error stat'ing %v: %v", fragPath, err)
-			continue
-		}
-		if info.Size() == 0 {
-			t.Errorf("%v: Expected size to increase, but it's still 0", fragPath)
-			continue
-		}
-		if firstSize == 0 {
-			firstSize = info.Size()
-		} else if info.Size() != firstSize {
-			t.Errorf("%v: Expected all fragments to be the same size (%v), but got %v", fragPath, firstSize, info.Size())
-		}
+	var lastSize int64
+	for patternIndex, pattern := range testPatterns {
+		writer.Write(pattern)
+		var firstSize int64
+		for index := 0; index < params.K+params.M; index++ {
+			fragPath := fmt.Sprintf("%stest_frags#%d", base, index)
+			info, err := os.Stat(fragPath)
+			if err != nil {
+				t.Errorf("Error stat'ing %v: %v", fragPath, err)
+				continue
+			}
+			if info.Size() == lastSize {
+				t.Errorf("%v: Expected size to increase, but it's still 0", fragPath)
+				continue
+			}
+			if firstSize == 0 {
+				firstSize = info.Size()
+			} else if info.Size() != firstSize {
+				t.Errorf("%v: Expected all fragments to be the same size (%v), but got %v", fragPath, firstSize, info.Size())
+			}
 
-		fd, err := os.Open(fragPath)
-		if err != nil {
-			t.Errorf("%v: %v", fragPath, err)
-			continue
-		}
-		defer fd.Close()
-		frag, err := ReadFragment(fd)
-		if err != nil {
-			t.Errorf("%v: %v", fragPath, err)
-			continue
-		}
+			fd, err := os.Open(fragPath)
+			if err != nil {
+				t.Errorf("%v: %v", fragPath, err)
+				continue
+			}
+			defer fd.Close()
+			for i := 0; i < patternIndex+1; i++ {
 
-		// Only wrote the one frag
-		junkData, err := ReadFragment(fd)
-		if err != io.EOF {
-			t.Errorf("%v: Expected EOF, got %v (and data %v)", fragPath, err, junkData)
-			continue
-		}
+				frag, err := ReadFragment(fd)
+				if err != nil {
+					t.Errorf("%v: %v", fragPath, err)
+					continue
+				}
 
-		fragInfo := GetFragmentInfo(frag)
-		if !fragInfo.IsValid {
-			t.Errorf("%v: Expected fragment to be valid", fragPath)
+				fragInfo := GetFragmentInfo(frag)
+				if !fragInfo.IsValid {
+					t.Errorf("%v: Expected fragment to be valid", fragPath)
+				}
+
+			}
+
+			// Only wrote N frags
+			junkData, err := ReadFragment(fd)
+			if err != io.EOF {
+				t.Errorf("%v: Expected EOF, got %v (and data %v)", fragPath, err, junkData)
+				continue
+			}
 		}
+		lastSize = firstSize
 	}
 
 	if err := writer.Close(); err != nil {
