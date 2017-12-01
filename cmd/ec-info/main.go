@@ -34,11 +34,16 @@ func handleFile(fname string) {
 	var baseline erasurecode.FragmentInfo
 	var orig_data_size uint64
 	gotEOF := false
+	sizeCheckMessage := ""
 	for {
 		frag, err := erasurecode.ReadFragment(fd)
 		if err == io.EOF {
 			gotEOF = true
 			break
+		}
+		if sizeCheckMessage != "" {
+			// We wait until now to report so we don't flag the last fragment
+			fmt.Printf(sizeCheckMessage)
 		}
 		found += 1
 		if err != nil {
@@ -63,7 +68,9 @@ func handleFile(fname string) {
 			fmt.Printf("    Fragment %v (offset 0x%08x) has unexpected index %v\n", found, offset, info.Index)
 		}
 		if info.Size != baseline.Size {
-			fmt.Printf("    Fragment %v (offset 0x%08x) has unexpected size %v\n", found, offset, info.Size)
+			sizeCheckMessage = fmt.Sprintf("    Fragment %v (offset 0x%08x) has unexpected size %v\n", found, offset, info.Size)
+		} else {
+			sizeCheckMessage = ""
 		}
 		offset += len(frag)
 	}
