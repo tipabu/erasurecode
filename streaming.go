@@ -160,3 +160,39 @@ func ReadFragment(reader io.Reader) ([]byte, error) {
 
 	return frag, nil
 }
+
+func GuessParams(readers []io.Reader) (params ErasureCodeParams, err error) {
+	var firstInfo *FragmentInfo
+	for i, reader := range readers {
+		info, _, headerErr := ReadFragmentHeader(reader)
+		if headerErr != nil {
+			err = headerErr
+			return
+		}
+
+		if firstInfo == nil {
+			firstInfo = &info
+			params.Name = info.BackendName
+			continue
+		}
+
+		// Validate that we seem to be talking about the same original data
+		if info.BackendId != (*firstInfo).BackendId {
+			err = fmt.Errorf("Backend mismatch on reader %d; got %d, expected %d", i, info.BackendName, (*firstInfo).BackendName)
+			return
+		}
+		if info.Size != (*firstInfo).Size {
+			err = fmt.Errorf("Size mismatch on reader %d; got %d, expected %d", i, info.Size, (*firstInfo).Size)
+			return
+		}
+		if info.OrigDataSize != (*firstInfo).OrigDataSize {
+			err = fmt.Errorf("OrigDataSize mismatch on reader %d; got %d, expected %d", i, info.OrigDataSize, (*firstInfo).OrigDataSize)
+			return
+		}
+
+		if info.Index >= params.M {
+			params.M = info.Index + 1
+		}
+	}
+	return
+}
