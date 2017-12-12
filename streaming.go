@@ -99,7 +99,7 @@ func (shim ECReader) Read(p []byte) (int, error) {
 				break
 			}
 			if err != nil {
-				return 0, err
+				return sz - len(p), err
 			}
 			frags[i] = frag
 		}
@@ -108,7 +108,7 @@ func (shim ECReader) Read(p []byte) (int, error) {
 		}
 		decoded, err := shim.Backend.Decode(frags)
 		if err != nil {
-			return 0, err
+			return sz - len(p), err
 		}
 
 		shim.buffer = decoded
