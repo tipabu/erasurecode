@@ -19,7 +19,7 @@ type ECWriter struct {
 
 type ECReader struct {
 	Backend *ErasureCodeBackend
-	Readers []io.ReadCloser
+	Readers []io.Reader
 	buffer  []byte
 }
 
@@ -84,42 +84,43 @@ func (shim ECWriter) Close() error {
 }
 
 func (shim ECReader) Read(p []byte) (int, error) {
-	return 0, fmt.Errorf("Not implemented")
+	sz := len(p)
+	frags := make([][]byte, len(shim.Readers))
+
 	n := copy(p, shim.buffer)
 	shim.buffer = shim.buffer[n:]
 	p = p[n:]
-	if len(p) == 0 {
-		return n, nil
-	}
-
-	// TODO: This shit needs a lot of work
-
-	frags := make([][]byte, len(shim.Readers))
-	// Read one fragment header from each stream
-	// Check that they all agree on how big the fragments should be
-	// Read the rest of the fragment from each stream
-	data, err := shim.Backend.Decode(frags)
-	shim.buffer = data
-	if err != nil {
-		return 0, err
-	}
-	for i, reader := range shim.Readers {
-		// TODO: check for errors
-		reader.Read(frags[i])
-	}
-	return len(p), nil
-}
-
-func (shim ECReader) Close() error {
-	var firstErr error
-	for _, reader := range shim.Readers {
-		err := reader.Close()
-		if err != nil && firstErr == nil {
-			firstErr = err
+	gotEOF := false
+	for len(p) > 0 {
+		for i, reader := range shim.Readers {
+			frag, err := ReadFragment(reader)
+			if err == io.EOF {
+				gotEOF = true
+				break
+			}
+			if err != nil {
+				return 0, err
+			}
+			frags[i] = frag
 		}
+		if gotEOF {
+			break
+		}
+		decoded, err := shim.Backend.Decode(frags)
+		if err != nil {
+			return 0, err
+		}
+
+		shim.buffer = decoded
+		n := copy(p, shim.buffer)
+		shim.buffer = shim.buffer[n:]
+		p = p[n:]
 	}
-	shim.buffer = nil
-	return firstErr
+	if len(p) == sz && gotEOF {
+		return 0, io.EOF
+	}
+
+	return sz - len(p), nil
 }
 
 func (backend *ErasureCodeBackend) GetFileWriter(prefix string, perm os.FileMode) (io.WriteCloser, error) {
@@ -130,21 +131,29 @@ func (backend *ErasureCodeBackend) GetFileWriter(prefix string, perm os.FileMode
 	return ECWriter{backend, writers}, nil
 }
 
-func ReadFragment(reader io.Reader) ([]byte, error) {
+func ReadFragmentHeader(reader io.Reader) (FragmentInfo, []byte, error) {
 	header := make([]byte, C.sizeof_struct_fragment_header_s)
 	n, err := io.ReadFull(reader, header)
 	if err != nil {
-		return header[:n], err
+		return FragmentInfo{}, header[:n], err
 	}
 	info := GetFragmentInfo(header)
 
 	if !info.IsValid {
-		return header, fmt.Errorf("Metadata checksum failed")
+		return FragmentInfo{}, header, fmt.Errorf("Metadata checksum failed")
+	}
+	return info, header, err
+}
+
+func ReadFragment(reader io.Reader) ([]byte, error) {
+	info, header, err := ReadFragmentHeader(reader)
+	if err != nil {
+		return header, err
 	}
 
 	frag := make([]byte, len(header)+info.Size)
 	copy(frag, header)
-	n, err = io.ReadFull(reader, frag[n:])
+	n, err := io.ReadFull(reader, frag[len(header):])
 	if err != nil {
 		return frag[:len(header)+n], err
 	}
