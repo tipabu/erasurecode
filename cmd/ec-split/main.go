@@ -37,9 +37,33 @@ func checkErr(err error) {
 	}
 }
 
+func copyNAtATime(output io.Writer, input io.Reader, n int) (written uint64, err error) {
+	buf := make([]byte, n)
+	for {
+		nr, er := io.ReadFull(input, buf)
+		if nr > 0 {
+			nw, ew := output.Write(buf[:n])
+			written += uint64(nw)
+			if ew != nil {
+				err = ew
+				return
+			}
+			if nw != nr {
+				err = io.ErrShortWrite
+				return
+			}
+		}
+		if er != nil {
+			if er != io.EOF && er != io.ErrUnexpectedEOF {
+				err = er
+			}
+			return
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
-	buf := make([]byte, *bufferSize)
 
 	if *backendName == "" {
 		checkErr(fmt.Errorf("missing required flag -b"))
@@ -80,7 +104,7 @@ func main() {
 	checkErr(err)
 	defer output.Close()
 
-	n, err := io.CopyBuffer(output, fd, buf)
+	n, err := copyNAtATime(output, fd, *bufferSize)
 	checkErr(err)
 	fmt.Printf("%v bytes copied\n", n)
 }
