@@ -5,12 +5,15 @@ package erasurecode
 #include <stdlib.h>
 #include <liberasurecode/erasurecode.h>
 #include <liberasurecode/erasurecode_helpers_ext.h>
-// shim to make dereferencing frags easier
-void * strArrayItem(char ** arr, int idx) { return arr[idx]; }
+// shims to make working with frag arrays easier
+char ** makeStrArray(int n) { return calloc(n, sizeof (char *)); }
+void freeStrArray(char ** arr) { free(arr); }
+void * getStrArrayItem(char ** arr, int idx) { return arr[idx]; }
+void setStrArrayItem(char ** arr, int idx, unsigned char * val) { arr[idx] = (char *) val; }
 // shims because the fragment headers use misaligned fields
 uint64_t getOrigDataSize(struct fragment_header_s *header) { return header->meta.orig_data_size; }
 uint32_t getBackendVersion(struct fragment_header_s *header) { return header->meta.backend_version; }
-ec_backend_id_t getBackendId(struct fragment_header_s *header) { return header->meta.backend_id; }
+ec_backend_id_t getBackendID(struct fragment_header_s *header) { return header->meta.backend_id; }
 uint32_t getECVersion(struct fragment_header_s *header) { return header->libec_version; }
 */
 import "C"
@@ -74,7 +77,7 @@ func AvailableBackends() (avail []string) {
 	return
 }
 
-type ErasureCodeParams struct {
+type Params struct {
 	Name string
 	K    int
 	M    int
@@ -82,22 +85,22 @@ type ErasureCodeParams struct {
 	HD   int
 }
 
-type ErasureCodeBackend struct {
-	ErasureCodeParams
-	libec_desc C.int
+type Backend struct {
+	Params
+	libecDesc C.int
 }
 
 func BackendIsAvailable(name string) bool {
-	id, err := nameToId(name)
+	id, err := nameToID(name)
 	if err != nil {
 		return false
 	}
 	return C.liberasurecode_backend_available(id) != 0
 }
 
-func InitBackend(params ErasureCodeParams) (ErasureCodeBackend, error) {
-	backend := ErasureCodeBackend{params, 0}
-	id, err := nameToId(backend.Name)
+func InitBackend(params Params) (Backend, error) {
+	backend := Backend{params, 0}
+	id, err := nameToID(backend.Name)
 	if err != nil {
 		return backend, err
 	}
@@ -109,102 +112,93 @@ func InitBackend(params ErasureCodeParams) (ErasureCodeBackend, error) {
 		ct: C.CHKSUM_CRC32,
 	})
 	if desc < 0 {
-		return backend, errors.New(fmt.Sprintf(
-			"instance_create() returned %v", errToName(-desc)))
+		return backend, fmt.Errorf("instance_create() returned %v", errToName(-desc))
 	}
-	backend.libec_desc = desc
+	backend.libecDesc = desc
 	return backend, nil
 }
 
-func (backend *ErasureCodeBackend) Close() error {
-	if backend.libec_desc == 0 {
+func (backend *Backend) Close() error {
+	if backend.libecDesc == 0 {
 		return errors.New("backend already closed")
 	}
-	if rc := C.liberasurecode_instance_destroy(backend.libec_desc); rc != 0 {
-		return errors.New(fmt.Sprintf(
-			"instance_destroy() returned %v", errToName(-rc)))
+	if rc := C.liberasurecode_instance_destroy(backend.libecDesc); rc != 0 {
+		return fmt.Errorf("instance_destroy() returned %v", errToName(-rc))
 	}
-	backend.libec_desc = 0
+	backend.libecDesc = 0
 	return nil
 }
 
-func (backend *ErasureCodeBackend) Encode(data []byte) ([][]byte, error) {
-	var data_frags **C.char
-	var parity_frags **C.char
-	var frag_len C.uint64_t
-	p_data := (*C.char)(unsafe.Pointer(&data[0]))
+func (backend *Backend) Encode(data []byte) ([][]byte, error) {
+	var dataFrags **C.char
+	var parityFrags **C.char
+	var fragLength C.uint64_t
+	pData := (*C.char)(unsafe.Pointer(&data[0]))
 	if rc := C.liberasurecode_encode(
-		backend.libec_desc, p_data, C.uint64_t(len(data)),
-		&data_frags, &parity_frags, &frag_len); rc != 0 {
-		return nil, errors.New(fmt.Sprintf(
-			"encode() returned %v", errToName(-rc)))
+		backend.libecDesc, pData, C.uint64_t(len(data)),
+		&dataFrags, &parityFrags, &fragLength); rc != 0 {
+		return nil, fmt.Errorf("encode() returned %v", errToName(-rc))
 	}
 	defer C.liberasurecode_encode_cleanup(
-		backend.libec_desc, data_frags, parity_frags)
+		backend.libecDesc, dataFrags, parityFrags)
 	result := make([][]byte, backend.K+backend.M)
 	for i := 0; i < backend.K; i++ {
-		result[i] = C.GoBytes(C.strArrayItem(data_frags, C.int(i)), C.int(frag_len))
+		result[i] = C.GoBytes(C.getStrArrayItem(dataFrags, C.int(i)), C.int(fragLength))
 	}
 	for i := 0; i < backend.M; i++ {
-		result[i+backend.K] = C.GoBytes(C.strArrayItem(parity_frags, C.int(i)), C.int(frag_len))
+		result[i+backend.K] = C.GoBytes(C.getStrArrayItem(parityFrags, C.int(i)), C.int(fragLength))
 	}
 	return result, nil
 }
 
-func (backend *ErasureCodeBackend) Decode(frags [][]byte) ([]byte, error) {
+func (backend *Backend) Decode(frags [][]byte) ([]byte, error) {
 	var data *C.char
-	var data_len C.uint64_t
+	var dataLength C.uint64_t
 	if len(frags) == 0 {
 		return nil, errors.New("decoding requires at least one fragment")
 	}
 
-	c_frags := (**C.char)(C.calloc(C.size_t(len(frags)), C.size_t(int(unsafe.Sizeof(data)))))
-	defer C.free(unsafe.Pointer(c_frags))
-	base := uintptr(unsafe.Pointer(c_frags))
+	cFrags := C.makeStrArray(C.int(len(frags)))
+	defer C.freeStrArray(cFrags)
 	for index, frag := range frags {
-		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
-		*ptr = (*C.char)(unsafe.Pointer(&frag[0]))
+		C.setStrArrayItem(cFrags, C.int(index), (*C.uchar)(&frag[0]))
 	}
 
 	if rc := C.liberasurecode_decode(
-		backend.libec_desc, c_frags, C.int(len(frags)),
+		backend.libecDesc, cFrags, C.int(len(frags)),
 		C.uint64_t(len(frags[0])), C.int(1),
-		&data, &data_len); rc != 0 {
-		return nil, errors.New(fmt.Sprintf(
-			"decode() returned %v", errToName(-rc)))
+		&data, &dataLength); rc != 0 {
+		return nil, fmt.Errorf("decode() returned %v", errToName(-rc))
 	}
-	defer C.liberasurecode_decode_cleanup(backend.libec_desc, data)
-	return C.GoBytes(unsafe.Pointer(data), C.int(data_len)), nil
+	defer C.liberasurecode_decode_cleanup(backend.libecDesc, data)
+	return C.GoBytes(unsafe.Pointer(data), C.int(dataLength)), nil
 }
 
-func (backend *ErasureCodeBackend) Reconstruct(frags [][]byte, frag_index int) ([]byte, error) {
+func (backend *Backend) Reconstruct(frags [][]byte, fragIndex int) ([]byte, error) {
 	if len(frags) == 0 {
 		return nil, errors.New("reconstruction requires at least one fragment")
 	}
-	frag_len := len(frags[0])
-	data := make([]byte, frag_len)
-	p_data := (*C.char)(unsafe.Pointer(&data[0]))
+	fragLength := len(frags[0])
+	data := make([]byte, fragLength)
+	pData := (*C.char)(unsafe.Pointer(&data[0]))
 
-	c_frags := (**C.char)(C.calloc(C.size_t(len(frags)), C.size_t(int(unsafe.Sizeof(p_data)))))
-	defer C.free(unsafe.Pointer(c_frags))
-	base := uintptr(unsafe.Pointer(c_frags))
+	cFrags := C.makeStrArray(C.int(len(frags)))
+	defer C.freeStrArray(cFrags)
 	for index, frag := range frags {
-		ptr := (**C.char)(unsafe.Pointer(base + uintptr(index)*unsafe.Sizeof(*c_frags)))
-		*ptr = (*C.char)(unsafe.Pointer(&frag[0]))
+		C.setStrArrayItem(cFrags, C.int(index), (*C.uchar)(&frag[0]))
 	}
 
 	if rc := C.liberasurecode_reconstruct_fragment(
-		backend.libec_desc, c_frags, C.int(len(frags)),
-		C.uint64_t(len(frags[0])), C.int(frag_index), p_data); rc != 0 {
-		return nil, errors.New(fmt.Sprintf(
-			"reconstruct_fragment() returned %v", errToName(-rc)))
+		backend.libecDesc, cFrags, C.int(len(frags)),
+		C.uint64_t(len(frags[0])), C.int(fragIndex), pData); rc != 0 {
+		return nil, fmt.Errorf("reconstruct_fragment() returned %v", errToName(-rc))
 	}
 	return data, nil
 }
 
-func (backend *ErasureCodeBackend) IsInvalidFragment(frag []byte) bool {
-	p_data := (*C.char)(unsafe.Pointer(&frag[0]))
-	return 1 == C.is_invalid_fragment(backend.libec_desc, p_data)
+func (backend *Backend) IsInvalidFragment(frag []byte) bool {
+	pData := (*C.char)(unsafe.Pointer(&frag[0]))
+	return 1 == C.is_invalid_fragment(backend.libecDesc, pData)
 }
 
 type FragmentInfo struct {
@@ -212,7 +206,7 @@ type FragmentInfo struct {
 	Size                int
 	BackendMetadataSize int
 	OrigDataSize        uint64
-	BackendId           C.ec_backend_id_t
+	BackendID           C.ec_backend_id_t
 	BackendName         string
 	BackendVersion      Version
 	ErasureCodeVersion  Version
@@ -221,14 +215,14 @@ type FragmentInfo struct {
 
 func GetFragmentInfo(frag []byte) FragmentInfo {
 	header := *(*C.struct_fragment_header_s)(unsafe.Pointer(&frag[0]))
-	backendId := C.getBackendId(&header)
+	backendID := C.getBackendID(&header)
 	return FragmentInfo{
 		Index:               int(header.meta.idx),
 		Size:                int(header.meta.size),
 		BackendMetadataSize: int(header.meta.frag_backend_metadata_size),
 		OrigDataSize:        uint64(C.getOrigDataSize(&header)),
-		BackendId:           backendId,
-		BackendName:         idToName(backendId),
+		BackendID:           backendID,
+		BackendName:         idToName(backendID),
 		BackendVersion:      makeVersion(C.getBackendVersion(&header)),
 		ErasureCodeVersion:  makeVersion(C.getECVersion(&header)),
 		IsValid:             C.is_invalid_fragment_header((*C.fragment_header_t)(&header)) == 0,

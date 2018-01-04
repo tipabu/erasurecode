@@ -59,7 +59,7 @@ func main() {
 	input := flag.Args()[0]
 	prefix := &input
 
-	backend, err := erasurecode.InitBackend(erasurecode.ErasureCodeParams{
+	backend, err := erasurecode.InitBackend(erasurecode.Params{
 		Name: *backendName,
 		K:    *numData,
 		M:    *numParity,

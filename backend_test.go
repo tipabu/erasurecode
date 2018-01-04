@@ -4,7 +4,7 @@ import "bytes"
 import "math/rand"
 import "testing"
 
-var validParams = []ErasureCodeParams{
+var validParams = []Params{
 	{Name: "liberasurecode_rs_vand", K: 2, M: 1},
 	{Name: "liberasurecode_rs_vand", K: 10, M: 4},
 	{Name: "liberasurecode_rs_vand", K: 4, M: 3},
@@ -78,8 +78,8 @@ func TestInitBackend(t *testing.T) {
 			t.Errorf("%q", err)
 			continue
 		}
-		if backend.libec_desc <= 0 {
-			t.Errorf("Expected backend descriptor > 0, got %d", backend.libec_desc)
+		if backend.libecDesc <= 0 {
+			t.Errorf("Expected backend descriptor > 0, got %d", backend.libecDesc)
 		}
 
 		if err = backend.Close(); err != nil {
@@ -93,20 +93,20 @@ func TestInitBackend(t *testing.T) {
 
 func TestInitBackendFailure(t *testing.T) {
 	cases := []struct {
-		params ErasureCodeParams
+		params Params
 		want   string
 	}{
-		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: -1, M: 1},
+		{Params{Name: "liberasurecode_rs_vand", K: -1, M: 1},
 			"instance_create() returned EINVALIDPARAMS"},
-		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: 10, M: -1},
+		{Params{Name: "liberasurecode_rs_vand", K: 10, M: -1},
 			"instance_create() returned EINVALIDPARAMS"},
-		{ErasureCodeParams{Name: "non-existent-backend", K: 10, M: 4},
+		{Params{Name: "non-existent-backend", K: 10, M: 4},
 			"unsupported backend \"non-existent-backend\""},
-		{ErasureCodeParams{Name: "", K: 10, M: 4},
+		{Params{Name: "", K: 10, M: 4},
 			"unsupported backend \"\""},
-		{ErasureCodeParams{Name: "liberasurecode_rs_vand", K: 20, M: 20},
+		{Params{Name: "liberasurecode_rs_vand", K: 20, M: 20},
 			"instance_create() returned EINVALIDPARAMS"},
-		{ErasureCodeParams{Name: "flat_xor_hd", K: 4, M: 4, HD: 3},
+		{Params{Name: "flat_xor_hd", K: 4, M: 4, HD: 3},
 			"instance_create() returned EBACKENDINITERR"},
 	}
 	for _, args := range cases {
@@ -114,17 +114,17 @@ func TestInitBackendFailure(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error when calling InitBackend(%v)",
 				args.params)
-			backend.Close()
+			_ = backend.Close()
 			continue
 		}
 		if err.Error() != args.want {
 			t.Errorf("InitBackend(%v) produced error %q, want %q",
 				args.params, err, args.want)
 		}
-		if backend.libec_desc != 0 {
+		if backend.libecDesc != 0 {
 			t.Errorf("InitBackend(%v) produced backend with descriptor %v, want 0",
-				args.params, backend.libec_desc)
-			backend.Close()
+				args.params, backend.libecDesc)
+			_ = backend.Close()
 		}
 	}
 }
@@ -174,7 +174,7 @@ func TestEncodeDecode(t *testing.T) {
 				if err != nil {
 					t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
 					return false
-				} else if bytes.Compare(data, pattern) != 0 {
+				} else if !bytes.Equal(data, pattern) {
 					t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
 					return false
 				}
@@ -213,7 +213,7 @@ func TestReconstruct(t *testing.T) {
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", params, err)
-			backend.Close()
+			_ = backend.Close()
 			continue
 		}
 		for patternIndex, pattern := range testPatterns {
@@ -227,7 +227,7 @@ func TestReconstruct(t *testing.T) {
 				if err != nil {
 					t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
 					return false
-				} else if bytes.Compare(data, frags[frag_index]) != 0 {
+				} else if !bytes.Equal(data, frags[frag_index]) {
 					t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
 					return false
 				}
@@ -261,7 +261,7 @@ func TestIsInvalidFragment(t *testing.T) {
 		backend, err := InitBackend(params)
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", params, err)
-			backend.Close()
+			_ = backend.Close()
 			continue
 		}
 		for patternIndex, pattern := range testPatterns {
@@ -340,7 +340,7 @@ func TestIsInvalidFragment(t *testing.T) {
 				copy(frag[63:67], fragCopy[63:67])
 				copy(frag[20:25], fragCopy[20:25])
 
-				if bytes.Compare(frag, fragCopy) != 0 {
+				if !bytes.Equal(frag, fragCopy) {
 					for i, orig := range fragCopy {
 						if frag[i] != orig {
 							t.Logf("%v != %v at index %v", frag[i], orig, i)
@@ -349,7 +349,7 @@ func TestIsInvalidFragment(t *testing.T) {
 					t.Fatal(corruptedByte, frag, fragCopy)
 				}
 
-				frag[corruptedByte] += 1
+				frag[corruptedByte]++
 				if !backend.IsInvalidFragment(frag) {
 					t.Errorf("%v: frag %v unexpectedly valid after incrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 				}
@@ -373,12 +373,12 @@ func TestIsInvalidFragment(t *testing.T) {
 }
 
 func TestBackendIsAvailable(t *testing.T) {
-	required_backends := []string{
+	requiredBackends := []string{
 		"null",
 		"flat_xor_hd",
 		"liberasurecode_rs_vand",
 	}
-	optional_backends := []string{
+	optionalBackends := []string{
 		"isa_l_rs_vand",
 		"isa_l_rs_cauchy",
 		"jerasure_rs_vand",
@@ -386,12 +386,12 @@ func TestBackendIsAvailable(t *testing.T) {
 		"shss",
 		"libphazr",
 	}
-	for _, name := range required_backends {
+	for _, name := range requiredBackends {
 		if !BackendIsAvailable(name) {
 			t.Fatalf("%v is not available", name)
 		}
 	}
-	for _, name := range optional_backends {
+	for _, name := range optionalBackends {
 		if !BackendIsAvailable(name) {
 			t.Logf("INFO: backend not available: %v", name)
 		}
@@ -400,11 +400,11 @@ func TestBackendIsAvailable(t *testing.T) {
 
 func TestAvailableBackends(t *testing.T) {
 	for _, name := range AvailableBackends() {
-		backend, err := InitBackend(ErasureCodeParams{Name: name, K: 3, M: 3, HD: 3})
+		backend, err := InitBackend(Params{Name: name, K: 3, M: 3, HD: 3})
 		if err != nil {
 			t.Errorf("Error creating backend %v: %q", name, err)
 		}
-		backend.Close()
+		_ = backend.Close()
 	}
 	t.Logf("INFO: found %v/%v available backends", len(AvailableBackends()), len(KnownBackends))
 }

@@ -11,7 +11,8 @@ import (
 
 func init() {
 	flag.Usage = func() {
-		fmt.Println("usage: ec-info file1 [... fileN]\n")
+		fmt.Println("usage: ec-info file1 [... fileN]")
+		fmt.Println()
 		fmt.Println("Print information about the fragment archives, such as:")
 		fmt.Println("  - erasure coding backend used")
 		fmt.Println("  - index of the archive")
@@ -32,7 +33,7 @@ func handleFile(fname string) {
 	fmt.Printf("Inspecting %q:\n", fname)
 	found, offset := 0, 0
 	var baseline erasurecode.FragmentInfo
-	var orig_data_size uint64
+	var origDataSize uint64
 	gotEOF := false
 	sizeCheckMessage := ""
 	for {
@@ -43,9 +44,9 @@ func handleFile(fname string) {
 		}
 		if sizeCheckMessage != "" {
 			// We wait until now to report so we don't flag the last fragment
-			fmt.Printf(sizeCheckMessage)
+			fmt.Print(sizeCheckMessage)
 		}
-		found += 1
+		found++
 		if err != nil {
 			fmt.Printf("    Error reading frag %v (offset 0x%08x): %v\n", found, offset, err)
 			offset += len(frag) // Keep our byte count up-to-date
@@ -59,7 +60,7 @@ func handleFile(fname string) {
 			fmt.Printf("Backend: %v/%v ", info.BackendName, info.BackendVersion)
 			fmt.Printf("libec/%v\n", info.ErasureCodeVersion)
 		}
-		orig_data_size += info.OrigDataSize
+		origDataSize += info.OrigDataSize
 
 		if info.BackendName != baseline.BackendName {
 			fmt.Printf("    Fragment %v (offset 0x%08x) has unexpected backend %v\n", found, offset, info.BackendName)
@@ -76,7 +77,7 @@ func handleFile(fname string) {
 	}
 
 	if gotEOF {
-		fmt.Printf("    Found %v fragments, totaling %v bytes (original file was %v bytes)\n\n", found, offset, orig_data_size)
+		fmt.Printf("    Found %v fragments, totaling %v bytes (original file was %v bytes)\n\n", found, offset, origDataSize)
 	} else {
 		fmt.Printf("    Found %v fragments, totaling %v bytes before aborting\n\n", found, offset)
 	}

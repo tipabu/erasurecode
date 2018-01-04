@@ -53,7 +53,14 @@ func TestWriting(t *testing.T) {
 
 	var lastSize int64
 	for patternIndex, pattern := range testPatterns {
-		writer.Write(pattern)
+		n, err := writer.Write(pattern)
+		if err != nil {
+			t.Errorf("%v while writing pattern %v", err, patternIndex)
+		}
+		if n != len(pattern) {
+			t.Errorf("Expected to write %v bytes while writing pattern %v, actually wrote %v", len(pattern), patternIndex, n)
+		}
+
 		var firstSize int64
 		for index := 0; index < params.K+params.M; index++ {
 			fragPath := fmt.Sprintf("%stest_frags#%d", base, index)

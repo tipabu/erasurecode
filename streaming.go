@@ -13,7 +13,7 @@ import (
 )
 
 type ECWriter struct {
-	Backend *ErasureCodeBackend
+	Backend *Backend
 	Writers []io.WriteCloser
 }
 
@@ -27,7 +27,7 @@ func getWriters(prefix string, n uint8, perm os.FileMode) ([]io.WriteCloser, err
 			// Clean up the writers we *did* open
 			for j = 0; i < j; j++ {
 				// Ignoring any errors allong the way
-				writers[i].Close()
+				_ = writers[i].Close()
 			}
 			return nil, err
 		}
@@ -59,7 +59,7 @@ func (shim ECWriter) Close() error {
 	return firstErr
 }
 
-func (backend *ErasureCodeBackend) GetFileWriter(prefix string, perm os.FileMode) (io.WriteCloser, error) {
+func (backend *Backend) GetFileWriter(prefix string, perm os.FileMode) (io.WriteCloser, error) {
 	writers, err := getWriters(prefix, uint8(backend.K+backend.M), perm)
 	if err != nil {
 		return nil, err

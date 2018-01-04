@@ -8,7 +8,7 @@ package erasurecode
 import "C"
 import "fmt"
 
-func nameToId(name string) (C.ec_backend_id_t, error) {
+func nameToID(name string) (C.ec_backend_id_t, error) {
 	switch name {
 	case "null":
 		return C.EC_BACKEND_NULL, nil
