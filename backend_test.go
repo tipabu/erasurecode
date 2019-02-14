@@ -410,7 +410,7 @@ func TestGC(t *testing.T) {
 	input := bytes.Repeat([]byte("X"), 1000000)
 	backend, err := InitBackend(
 		Params{
-			Name: "isa_l_rs_cauchy",
+			Name: "liberasurecode_rs_vand",
 			K:    2,
 			M:    1,
 		})
