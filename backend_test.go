@@ -1,8 +1,11 @@
 package erasurecode
 
-import "bytes"
-import "math/rand"
-import "testing"
+import (
+	"bytes"
+	"math/rand"
+	"sync"
+	"testing"
+)
 
 var validParams = []Params{
 	{Name: "liberasurecode_rs_vand", K: 2, M: 1},
@@ -395,6 +398,101 @@ func TestBackendIsAvailable(t *testing.T) {
 		if !BackendIsAvailable(name) {
 			t.Logf("INFO: backend not available: %v", name)
 		}
+	}
+}
+
+// TestGC do multiple decode / reconstruct in concurrent goroutine.
+// When enough data has been allocated and freed, the GC will wakeup
+// and may destroy a block in-use. If this block is re-allocated,
+// the content is most likely no longer valid and it should
+// trigger an error or a crash.
+func TestGC(t *testing.T) {
+	input := bytes.Repeat([]byte("X"), 1000000)
+	backend, err := InitBackend(
+		Params{
+			Name: "isa_l_rs_cauchy",
+			K:    2,
+			M:    1,
+		})
+
+	if err != nil {
+		t.Logf("Cannot run test because %s", err)
+		return
+	}
+
+	tests := []struct {
+		name     string
+		testFunc func()
+	}{
+		struct {
+			name     string
+			testFunc func()
+		}{
+			"Reconstruct",
+			func() {
+				vect, err := backend.Encode(input)
+
+				if err != nil {
+					t.Fatal("cannot encode data")
+					return
+				}
+
+				oldData := vect[0][:] // force a copy
+
+				data, err := backend.Reconstruct(vect[1:3], 0)
+				if err != nil {
+					t.Fatalf("cannot reconstruct data, %s", err)
+					return
+				}
+
+				if len(data) != len(oldData) {
+					t.Fatal("reconstructing failed")
+					return
+				}
+			},
+		},
+		struct {
+			name     string
+			testFunc func()
+		}{
+			"Decode",
+			func() {
+				vect, err := backend.Encode(input)
+
+				if err != nil {
+					t.Fatal("cannot encode data")
+					return
+				}
+
+				data, err := backend.Decode(vect[0:2])
+				if err != nil {
+					t.Fatalf("cannot decode data: %v", err)
+					return
+				}
+
+				if len(data) != len(input) {
+					t.Fatal("decoding failed")
+					return
+				}
+			},
+		},
+	}
+
+	nbRoutines := 500
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var wg sync.WaitGroup
+			wg.Add(nbRoutines)
+
+			for i := 0; i < nbRoutines; i++ {
+				go func() {
+					test.testFunc()
+					wg.Done()
+				}()
+			}
+			wg.Wait()
+		})
 	}
 }
 

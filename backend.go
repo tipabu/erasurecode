@@ -21,6 +21,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"unsafe"
 )
 
@@ -171,6 +172,7 @@ func (backend *Backend) Decode(frags [][]byte) ([]byte, error) {
 		return nil, fmt.Errorf("decode() returned %v", errToName(-rc))
 	}
 	defer C.liberasurecode_decode_cleanup(backend.libecDesc, data)
+	runtime.KeepAlive(frags) // prevent frags from being GC-ed during decode
 	return C.GoBytes(unsafe.Pointer(data), C.int(dataLength)), nil
 }
 
@@ -193,6 +195,7 @@ func (backend *Backend) Reconstruct(frags [][]byte, fragIndex int) ([]byte, erro
 		C.uint64_t(len(frags[0])), C.int(fragIndex), pData); rc != 0 {
 		return nil, fmt.Errorf("reconstruct_fragment() returned %v", errToName(-rc))
 	}
+	runtime.KeepAlive(frags) // prevent frags from being GC-ed during reconstruct
 	return data, nil
 }
 
