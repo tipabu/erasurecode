@@ -430,7 +430,7 @@ func TestBackendIsAvailable(t *testing.T) {
 	}
 	for _, name := range requiredBackends {
 		if !BackendIsAvailable(name) {
-			t.Fatalf("%v is not available", name)
+			t.Errorf("%v is not available", name)
 		}
 	}
 	for _, name := range optionalBackends {
