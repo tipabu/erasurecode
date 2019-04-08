@@ -7,32 +7,41 @@ import (
 	"testing"
 )
 
-var validParams = []Params{
-	{Name: "liberasurecode_rs_vand", K: 2, M: 1},
-	{Name: "liberasurecode_rs_vand", K: 10, M: 4},
-	{Name: "liberasurecode_rs_vand", K: 4, M: 3},
-	{Name: "liberasurecode_rs_vand", K: 8, M: 4},
-	{Name: "liberasurecode_rs_vand", K: 15, M: 4},
-	{Name: "isa_l_rs_vand", K: 2, M: 1},
-	{Name: "isa_l_rs_vand", K: 10, M: 4},
-	{Name: "isa_l_rs_vand", K: 4, M: 3},
-	{Name: "isa_l_rs_vand", K: 8, M: 4},
-	{Name: "isa_l_rs_vand", K: 15, M: 4},
-	{Name: "isa_l_rs_cauchy", K: 2, M: 1},
-	{Name: "isa_l_rs_cauchy", K: 10, M: 4},
-	{Name: "isa_l_rs_cauchy", K: 4, M: 3},
-	{Name: "isa_l_rs_cauchy", K: 8, M: 4},
-	{Name: "isa_l_rs_cauchy", K: 15, M: 4},
-	{Name: "jerasure_rs_vand", K: 2, M: 1},
-	{Name: "jerasure_rs_vand", K: 10, M: 4},
-	{Name: "jerasure_rs_vand", K: 4, M: 3},
-	{Name: "jerasure_rs_vand", K: 8, M: 4},
-	{Name: "jerasure_rs_vand", K: 15, M: 4},
-	{Name: "jerasure_rs_cauchy", K: 2, M: 1},
-	{Name: "jerasure_rs_cauchy", K: 10, M: 4},
-	{Name: "jerasure_rs_cauchy", K: 4, M: 3},
-	{Name: "jerasure_rs_cauchy", K: 8, M: 4},
-	{Name: "jerasure_rs_cauchy", K: 15, M: 4, W: 5},
+var validParamGroups = []struct {
+	name   string
+	params []Params
+}{
+	{"liberasurecode", []Params{
+		{Name: "liberasurecode_rs_vand", K: 2, M: 1},
+		{Name: "liberasurecode_rs_vand", K: 10, M: 4},
+		{Name: "liberasurecode_rs_vand", K: 4, M: 3},
+		{Name: "liberasurecode_rs_vand", K: 8, M: 4},
+		{Name: "liberasurecode_rs_vand", K: 15, M: 4},
+	}},
+	{"isa_l", []Params{
+		{Name: "isa_l_rs_vand", K: 2, M: 1},
+		{Name: "isa_l_rs_vand", K: 10, M: 4},
+		{Name: "isa_l_rs_vand", K: 4, M: 3},
+		{Name: "isa_l_rs_vand", K: 8, M: 4},
+		{Name: "isa_l_rs_vand", K: 15, M: 4},
+		{Name: "isa_l_rs_cauchy", K: 2, M: 1},
+		{Name: "isa_l_rs_cauchy", K: 10, M: 4},
+		{Name: "isa_l_rs_cauchy", K: 4, M: 3},
+		{Name: "isa_l_rs_cauchy", K: 8, M: 4},
+		{Name: "isa_l_rs_cauchy", K: 15, M: 4},
+	}},
+	{"jerasure", []Params{
+		{Name: "jerasure_rs_vand", K: 2, M: 1},
+		{Name: "jerasure_rs_vand", K: 10, M: 4},
+		{Name: "jerasure_rs_vand", K: 4, M: 3},
+		{Name: "jerasure_rs_vand", K: 8, M: 4},
+		{Name: "jerasure_rs_vand", K: 15, M: 4},
+		{Name: "jerasure_rs_cauchy", K: 2, M: 1},
+		{Name: "jerasure_rs_cauchy", K: 10, M: 4},
+		{Name: "jerasure_rs_cauchy", K: 4, M: 3},
+		{Name: "jerasure_rs_cauchy", K: 8, M: 4},
+		{Name: "jerasure_rs_cauchy", K: 15, M: 4, W: 5},
+	}},
 }
 
 var testPatterns = [][]byte{
@@ -69,27 +78,29 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestInitBackend(t *testing.T) {
-	for _, params := range validParams {
-		backend, err := InitBackend(params)
-		if !BackendIsAvailable(params.Name) {
-			if err == nil {
-				t.Errorf("Expected EBACKENDNOTAVAIL")
+	for _, group := range validParamGroups {
+		for _, params := range group.params {
+			backend, err := InitBackend(params)
+			if !BackendIsAvailable(params.Name) {
+				if err == nil {
+					t.Errorf("Expected EBACKENDNOTAVAIL")
+				}
+				continue
 			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("%q", err)
-			continue
-		}
-		if backend.libecDesc <= 0 {
-			t.Errorf("Expected backend descriptor > 0, got %d", backend.libecDesc)
-		}
+			if err != nil {
+				t.Errorf("%q", err)
+				continue
+			}
+			if backend.libecDesc <= 0 {
+				t.Errorf("Expected backend descriptor > 0, got %d", backend.libecDesc)
+			}
 
-		if err = backend.Close(); err != nil {
-			t.Errorf("%q", err)
-		}
-		if err = backend.Close(); err == nil {
-			t.Errorf("Expected error when closing an already-closed backend.")
+			if err = backend.Close(); err != nil {
+				t.Errorf("%q", err)
+			}
+			if err = backend.Close(); err == nil {
+				t.Errorf("Expected error when closing an already-closed backend.")
+			}
 		}
 	}
 }
@@ -133,245 +144,273 @@ func TestInitBackendFailure(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	for _, params := range validParams {
-		if !BackendIsAvailable(params.Name) {
-			continue
-		}
-		backend, err := InitBackend(params)
-		if err != nil {
-			t.Errorf("Error creating backend %v: %q", params, err)
-			continue
-		}
-		for patternIndex, pattern := range testPatterns {
-			frags, err := backend.Encode(pattern)
-			if err != nil {
-				t.Errorf("Error encoding %v: %q", params, err)
-				break
-			}
-
-			expectedVersion := GetVersion()
-			for index, frag := range frags {
-				info := GetFragmentInfo(frag)
-				if info.Index != index {
-					t.Errorf("Expected frag %v to have index %v; got %v", index, index, info.Index)
+	for _, group := range validParamGroups {
+		t.Run(group.name, func(t *testing.T) {
+			var ranOne = false
+			for _, params := range group.params {
+				if !BackendIsAvailable(params.Name) {
+					continue
 				}
-				if info.Size != len(frag)-80 { // 80 == sizeof (struct fragment_header_s)
-					t.Errorf("Expected frag %v to have size %v; got %v", index, len(frag)-80, info.Size)
-				}
-				if info.OrigDataSize != uint64(len(pattern)) {
-					t.Errorf("Expected frag %v to have orig_data_size %v; got %v", index, len(pattern), info.OrigDataSize)
-				}
-				if info.BackendName != params.Name {
-					t.Errorf("Expected frag %v to have backend %v; got %v", index, params.Name, info.BackendName)
-				}
-				if info.ErasureCodeVersion != expectedVersion {
-					t.Errorf("Expected frag %v to have EC version %v; got %v", index, expectedVersion, info.ErasureCodeVersion)
-				}
-				if !info.IsValid {
-					t.Errorf("Expected frag %v to be valid", index)
-				}
-			}
-
-			decode := func(frags [][]byte, description string) bool {
-				data, err := backend.Decode(frags)
+				ranOne = true
+				backend, err := InitBackend(params)
 				if err != nil {
-					t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
-					return false
-				} else if !bytes.Equal(data, pattern) {
-					t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
-					return false
+					t.Errorf("Error creating backend %v: %q", params, err)
+					continue
 				}
-				return true
+				for patternIndex, pattern := range testPatterns {
+					frags, err := backend.Encode(pattern)
+					if err != nil {
+						t.Errorf("Error encoding %v: %q", params, err)
+						break
+					}
+
+					expectedVersion := GetVersion()
+					for index, frag := range frags {
+						info := GetFragmentInfo(frag)
+						if info.Index != index {
+							t.Errorf("Expected frag %v to have index %v; got %v", index, index, info.Index)
+						}
+						if info.Size != len(frag)-80 { // 80 == sizeof (struct fragment_header_s)
+							t.Errorf("Expected frag %v to have size %v; got %v", index, len(frag)-80, info.Size)
+						}
+						if info.OrigDataSize != uint64(len(pattern)) {
+							t.Errorf("Expected frag %v to have orig_data_size %v; got %v", index, len(pattern), info.OrigDataSize)
+						}
+						if info.BackendName != params.Name {
+							t.Errorf("Expected frag %v to have backend %v; got %v", index, params.Name, info.BackendName)
+						}
+						if info.ErasureCodeVersion != expectedVersion {
+							t.Errorf("Expected frag %v to have EC version %v; got %v", index, expectedVersion, info.ErasureCodeVersion)
+						}
+						if !info.IsValid {
+							t.Errorf("Expected frag %v to be valid", index)
+						}
+					}
+
+					decode := func(frags [][]byte, description string) bool {
+						data, err := backend.Decode(frags)
+						if err != nil {
+							t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
+							return false
+						} else if !bytes.Equal(data, pattern) {
+							t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
+							return false
+						}
+						return true
+					}
+
+					var good bool
+					good = decode(frags, "all frags")
+					good = good && decode(shuf(frags), "all frags, shuffled")
+					good = good && decode(frags[:params.K], "data frags")
+					good = good && decode(shuf(frags[:params.K]), "shuffled data frags")
+					good = good && decode(frags[params.M:], "with parity frags")
+					good = good && decode(shuf(frags[params.M:]), "shuffled parity frags")
+
+					if !good {
+						// If one pattern fails to round-trip, no point trying others for these args
+						break
+					}
+				}
+
+				if _, err := backend.Decode([][]byte{}); err == nil {
+					t.Errorf("Expected error when decoding from empty fragment array")
+				}
+
+				err = backend.Close()
+				if err != nil {
+					t.Errorf("Error closing backend %v: %q", backend, err)
+				}
 			}
-
-			var good bool
-			good = decode(frags, "all frags")
-			good = good && decode(shuf(frags), "all frags, shuffled")
-			good = good && decode(frags[:params.K], "data frags")
-			good = good && decode(shuf(frags[:params.K]), "shuffled data frags")
-			good = good && decode(frags[params.M:], "with parity frags")
-			good = good && decode(shuf(frags[params.M:]), "shuffled parity frags")
-
-			if !good {
-				break
+			if !ranOne {
+				t.Skip()
 			}
-		}
-
-		if _, err := backend.Decode([][]byte{}); err == nil {
-			t.Errorf("Expected error when decoding from empty fragment array")
-		}
-
-		err = backend.Close()
-		if err != nil {
-			t.Errorf("Error closing backend %v: %q", backend, err)
-		}
+		})
 	}
 }
 
 func TestReconstruct(t *testing.T) {
-	for _, params := range validParams {
-		if !BackendIsAvailable(params.Name) {
-			continue
-		}
-		backend, err := InitBackend(params)
-		if err != nil {
-			t.Errorf("Error creating backend %v: %q", params, err)
-			_ = backend.Close()
-			continue
-		}
-		for patternIndex, pattern := range testPatterns {
-			frags, err := backend.Encode(pattern)
-			if err != nil {
-				t.Errorf("Error encoding %v: %q", params, err)
-			}
-
-			reconstruct := func(recon_frags [][]byte, frag_index int, description string) bool {
-				data, err := backend.Reconstruct(recon_frags, frag_index)
-				if err != nil {
-					t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
-					return false
-				} else if !bytes.Equal(data, frags[frag_index]) {
-					t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
-					return false
+	for _, group := range validParamGroups {
+		t.Run(group.name, func(t *testing.T) {
+			var ranOne = false
+			for _, params := range group.params {
+				if !BackendIsAvailable(params.Name) {
+					continue
 				}
-				return true
+				ranOne = true
+				backend, err := InitBackend(params)
+				if err != nil {
+					t.Errorf("Error creating backend %v: %q", params, err)
+					_ = backend.Close()
+					continue
+				}
+				for patternIndex, pattern := range testPatterns {
+					frags, err := backend.Encode(pattern)
+					if err != nil {
+						t.Errorf("Error encoding %v: %q", params, err)
+					}
+
+					reconstruct := func(recon_frags [][]byte, frag_index int, description string) bool {
+						data, err := backend.Reconstruct(recon_frags, frag_index)
+						if err != nil {
+							t.Errorf("%v: %v: %q for pattern %d", description, backend, err, patternIndex)
+							return false
+						} else if !bytes.Equal(data, frags[frag_index]) {
+							t.Errorf("%v: Expected %v to roundtrip pattern %d, got %q", description, backend, patternIndex, data)
+							return false
+						}
+						return true
+					}
+
+					var good bool
+					good = reconstruct(shuf(frags[:params.K]), params.K+params.M-1, "last frag from data frags")
+					good = good && reconstruct(shuf(frags[params.M:]), 0, "first frag with parity frags")
+					if !good {
+						break
+					}
+				}
+
+				if _, err := backend.Reconstruct([][]byte{}, 0); err == nil {
+					t.Errorf("Expected error when reconstructing from empty fragment array")
+				}
+
+				err = backend.Close()
+				if err != nil {
+					t.Errorf("Error closing backend %v: %q", backend, err)
+				}
 			}
-
-			var good bool
-			good = reconstruct(shuf(frags[:params.K]), params.K+params.M-1, "last frag from data frags")
-			good = good && reconstruct(shuf(frags[params.M:]), 0, "first frag with parity frags")
-			if !good {
-				break
+			if !ranOne {
+				t.Skip()
 			}
-		}
-
-		if _, err := backend.Reconstruct([][]byte{}, 0); err == nil {
-			t.Errorf("Expected error when reconstructing from empty fragment array")
-		}
-
-		err = backend.Close()
-		if err != nil {
-			t.Errorf("Error closing backend %v: %q", backend, err)
-		}
+		})
 	}
 }
 
 func TestIsInvalidFragment(t *testing.T) {
-	for _, params := range validParams {
-		if !BackendIsAvailable(params.Name) {
-			continue
-		}
-		backend, err := InitBackend(params)
-		if err != nil {
-			t.Errorf("Error creating backend %v: %q", params, err)
-			_ = backend.Close()
-			continue
-		}
-		for patternIndex, pattern := range testPatterns {
-			frags, err := backend.Encode(pattern)
-			if err != nil {
-				t.Errorf("Error encoding %v: %q", params, err)
-				continue
-			}
-			for index, frag := range frags {
-				if backend.IsInvalidFragment(frag) {
-					t.Errorf("%v: frag %v unexpectedly invalid for pattern %d", backend, index, patternIndex)
+	for _, group := range validParamGroups {
+		t.Run(group.name, func(t *testing.T) {
+			var ranOne = false
+			for _, params := range group.params {
+				if !BackendIsAvailable(params.Name) {
+					continue
 				}
-				fragCopy := make([]byte, len(frag))
-				copy(fragCopy, frag)
-
-				// corrupt the frag
-				corruptedByte := rand.Intn(len(frag))
-				for 71 <= corruptedByte && corruptedByte < 80 {
-					// in the alignment padding -- try again
-					corruptedByte = rand.Intn(len(frag))
+				ranOne = true
+				backend, err := InitBackend(params)
+				if err != nil {
+					t.Errorf("Error creating backend %v: %q", params, err)
+					_ = backend.Close()
+					continue
 				}
-				frag[corruptedByte] ^= 0xff
-				if !backend.IsInvalidFragment(frag) {
-					t.Errorf("%v: frag %v unexpectedly valid after inverting byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
-				}
-				if corruptedByte < 4 || 8 <= corruptedByte && corruptedByte <= 59 {
-					/** corruption is in metadata; claim we were created by a version of
-					 *  libec that predates metadata checksums. Note that
-					 *  Note that a corrupted fragment size (bytes 4-7) will lead to a
-					 *  segfault when we try to verify the fragment -- there's a reason
-					 *  we added metadata checksums!
-					 */
-					copy(frag[63:67], []byte{9, 1, 1, 0})
-					if 20 <= corruptedByte && corruptedByte <= 53 {
-						/** Corrupted data checksum type or data checksum
-						 *  We may or may not detect this type of error; in particular,
-						 *      - if data checksum type is not in ec_checksum_type_t,
-						 *        it is ignored
-						 *      - if data checksum is mangled, we may still be valid
-						 *        under the "alternative" CRC32; this seems more likely
-						 *        with the byte inversion when the data is short
-						 *  Either way, though, clearing the checksum type should make
-						 *  it pass.
-						 */
-						frag[20] = 0
+				for patternIndex, pattern := range testPatterns {
+					frags, err := backend.Encode(pattern)
+					if err != nil {
+						t.Errorf("Error encoding %v: %q", params, err)
+						continue
+					}
+					for index, frag := range frags {
 						if backend.IsInvalidFragment(frag) {
-							t.Errorf("%v: frag %v unexpectedly invalid after clearing metadata crc and disabling data crc", backend, index)
+							t.Errorf("%v: frag %v unexpectedly invalid for pattern %d", backend, index, patternIndex)
 						}
-					} else if corruptedByte >= 54 || 0 <= corruptedByte && corruptedByte < 4 {
-						/** Some corruptions of some bytes are still detectable. Since we're
-						 *  inverting the byte, we can detect:
-						 *      - frag index -- bytes 0-3
-						 *      - data checksum type -- byte 20
-						 *      - data checksum mismatch -- byte 54
-						 *      - backend id -- byte 55
-						 *      - backend version -- bytes 56-59
-						 */
+						fragCopy := make([]byte, len(frag))
+						copy(fragCopy, frag)
+
+						// corrupt the frag
+						corruptedByte := rand.Intn(len(frag))
+						for 71 <= corruptedByte && corruptedByte < 80 {
+							// in the alignment padding -- try again
+							corruptedByte = rand.Intn(len(frag))
+						}
+						frag[corruptedByte] ^= 0xff
 						if !backend.IsInvalidFragment(frag) {
-							t.Errorf("%v: frag %v unexpectedly still valid after clearing metadata crc", backend, index)
+							t.Errorf("%v: frag %v unexpectedly valid after inverting byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
 						}
-					} else {
-						if backend.IsInvalidFragment(frag) {
-							t.Errorf("%v: frag %v unexpectedly invalid after clearing metadata crc", backend, index)
+						if corruptedByte < 4 || 8 <= corruptedByte && corruptedByte <= 59 {
+							/** corruption is in metadata; claim we were created by a version of
+							 *  libec that predates metadata checksums. Note that
+							 *  Note that a corrupted fragment size (bytes 4-7) will lead to a
+							 *  segfault when we try to verify the fragment -- there's a reason
+							 *  we added metadata checksums!
+							 */
+							copy(frag[63:67], []byte{9, 1, 1, 0})
+							if 20 <= corruptedByte && corruptedByte <= 53 {
+								/** Corrupted data checksum type or data checksum
+								 *  We may or may not detect this type of error; in particular,
+								 *      - if data checksum type is not in ec_checksum_type_t,
+								 *        it is ignored
+								 *      - if data checksum is mangled, we may still be valid
+								 *        under the "alternative" CRC32; this seems more likely
+								 *        with the byte inversion when the data is short
+								 *  Either way, though, clearing the checksum type should make
+								 *  it pass.
+								 */
+								frag[20] = 0
+								if backend.IsInvalidFragment(frag) {
+									t.Errorf("%v: frag %v unexpectedly invalid after clearing metadata crc and disabling data crc", backend, index)
+								}
+							} else if corruptedByte >= 54 || 0 <= corruptedByte && corruptedByte < 4 {
+								/** Some corruptions of some bytes are still detectable. Since we're
+								 *  inverting the byte, we can detect:
+								 *      - frag index -- bytes 0-3
+								 *      - data checksum type -- byte 20
+								 *      - data checksum mismatch -- byte 54
+								 *      - backend id -- byte 55
+								 *      - backend version -- bytes 56-59
+								 */
+								if !backend.IsInvalidFragment(frag) {
+									t.Errorf("%v: frag %v unexpectedly still valid after clearing metadata crc", backend, index)
+								}
+							} else {
+								if backend.IsInvalidFragment(frag) {
+									t.Errorf("%v: frag %v unexpectedly invalid after clearing metadata crc", backend, index)
+								}
+							}
+						} else if corruptedByte >= 67 {
+							copy(frag[20:25], []byte{1, 0, 0, 0, 0})
+							// And since we've changed the metadata, roll back version as above...
+							copy(frag[63:67], []byte{9, 1, 1, 0})
+							if backend.IsInvalidFragment(frag) {
+								t.Errorf("%v: frag %v unexpectedly invalid after clearing data crc", backend, index)
+								t.FailNow()
+							}
 						}
-					}
-				} else if corruptedByte >= 67 {
-					copy(frag[20:25], []byte{1, 0, 0, 0, 0})
-					// And since we've changed the metadata, roll back version as above...
-					copy(frag[63:67], []byte{9, 1, 1, 0})
-					if backend.IsInvalidFragment(frag) {
-						t.Errorf("%v: frag %v unexpectedly invalid after clearing data crc", backend, index)
-						t.FailNow()
-					}
-				}
-				frag[corruptedByte] ^= 0xff
-				copy(frag[63:67], fragCopy[63:67])
-				copy(frag[20:25], fragCopy[20:25])
+						frag[corruptedByte] ^= 0xff
+						copy(frag[63:67], fragCopy[63:67])
+						copy(frag[20:25], fragCopy[20:25])
 
-				if !bytes.Equal(frag, fragCopy) {
-					for i, orig := range fragCopy {
-						if frag[i] != orig {
-							t.Logf("%v != %v at index %v", frag[i], orig, i)
+						if !bytes.Equal(frag, fragCopy) {
+							for i, orig := range fragCopy {
+								if frag[i] != orig {
+									t.Logf("%v != %v at index %v", frag[i], orig, i)
+								}
+							}
+							t.Fatal(corruptedByte, frag, fragCopy)
+						}
+
+						frag[corruptedByte]++
+						if !backend.IsInvalidFragment(frag) {
+							t.Errorf("%v: frag %v unexpectedly valid after incrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
+						}
+						frag[corruptedByte] -= 2
+						if corruptedByte >= 63 && corruptedByte < 67 && frag[corruptedByte] != 0xff {
+							if backend.IsInvalidFragment(frag) {
+								t.Errorf("%v: frag %v unexpectedly invalid after decrementing version byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
+							}
+						} else {
+							if !backend.IsInvalidFragment(frag) {
+								t.Errorf("%v: frag %v unexpectedly valid after decrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
+							}
 						}
 					}
-					t.Fatal(corruptedByte, frag, fragCopy)
 				}
-
-				frag[corruptedByte]++
-				if !backend.IsInvalidFragment(frag) {
-					t.Errorf("%v: frag %v unexpectedly valid after incrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
-				}
-				frag[corruptedByte] -= 2
-				if corruptedByte >= 63 && corruptedByte < 67 && frag[corruptedByte] != 0xff {
-					if backend.IsInvalidFragment(frag) {
-						t.Errorf("%v: frag %v unexpectedly invalid after decrementing version byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
-					}
-				} else {
-					if !backend.IsInvalidFragment(frag) {
-						t.Errorf("%v: frag %v unexpectedly valid after decrementing byte %d for pattern %d", backend, index, corruptedByte, patternIndex)
-					}
+				err = backend.Close()
+				if err != nil {
+					t.Errorf("Error closing backend %v: %q", backend, err)
 				}
 			}
-		}
-		err = backend.Close()
-		if err != nil {
-			t.Errorf("Error closing backend %v: %q", backend, err)
-		}
+			if !ranOne {
+				t.Skip()
+			}
+		})
 	}
 }
 

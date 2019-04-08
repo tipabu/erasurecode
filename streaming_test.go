@@ -22,7 +22,7 @@ func TestWriting(t *testing.T) {
 	base := tempDir()
 	defer os.RemoveAll(base)
 
-	params := validParams[0]
+	params := validParamGroups[0].params[0]
 	backend, err := InitBackend(params)
 	if err != nil {
 		t.Errorf("Error creating backend %v: %q", params, err)
