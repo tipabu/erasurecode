@@ -438,6 +438,11 @@ func TestBackendIsAvailable(t *testing.T) {
 			t.Logf("INFO: backend not available: %v", name)
 		}
 	}
+
+	name := "fake-backend"
+	if BackendIsAvailable(name) {
+		t.Errorf("%v unexpectedly available", name)
+	}
 }
 
 // TestGC do multiple decode / reconstruct in concurrent goroutine.
