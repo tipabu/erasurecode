@@ -54,7 +54,7 @@ $(JERASURESRC)/configure: $(JERASURESRC)/configure.ac
 
 $(PWD)/deps/%/Makefile: $(PWD)/deps/%/configure
 	cd $(@D) && ./configure --prefix=$(BUILDDIR) \
-	LDFLAGS=-L$(BUILDDIR)/lib CFLAGS=-I$(BUILDDIR)/include
+	LDFLAGS=-L$(BUILDDIR)/lib CPPFLAGS=-I$(BUILDDIR)/include
 
 
 $(BUILDDIR)/lib/liberasurecode.a: $(LIBECSRC)/Makefile
