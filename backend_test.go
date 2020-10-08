@@ -2,8 +2,10 @@ package erasurecode
 
 import (
 	"bytes"
+	"fmt"
 	"hash/crc32"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 )
@@ -555,4 +557,75 @@ func TestAvailableBackends(t *testing.T) {
 		_ = backend.Close()
 	}
 	t.Logf("INFO: found %v/%v available backends", len(AvailableBackends()), len(KnownBackends))
+}
+
+func TestLegacyCRC(t *testing.T) {
+	if GetVersion().Less(Version{1, 6, 0}) {
+		t.Skip()
+	}
+	for _, val := range []string{
+		"",
+		"0",
+	} {
+
+		t.Run(fmt.Sprintf("LIBERASURECODE_WRITE_LEGACY_CRC=%s", val), func(t *testing.T) {
+			os.Setenv("LIBERASURECODE_WRITE_LEGACY_CRC", val)
+			input := bytes.Repeat([]byte("X"), 1000)
+			backend, err := InitBackend(
+				Params{
+					Name: "liberasurecode_rs_vand",
+					K:    2,
+					M:    1,
+				})
+			if err != nil {
+				t.Fatalf("Error creating backend: %q", err)
+			}
+			frags, err := backend.Encode(input)
+			if err != nil {
+				t.Fatalf("Error encoding frags: %q", err)
+			}
+			for index, frag := range frags {
+				info := GetFragmentInfo(frag)
+				if expectedChecksum := crc32.ChecksumIEEE(frag[0:59]); info.MetadataChecksum != expectedChecksum {
+					t.Errorf("Expected frag %v to have metadata CRC %x; got %x", index, expectedChecksum, info.MetadataChecksum)
+				}
+			}
+		})
+	}
+	if GetVersion().Less(Version{1, 6, 2}) {
+		t.Skip()
+	}
+	for _, val := range []string{
+		"1",
+		"00",
+		"true",
+	} {
+
+		t.Run(fmt.Sprintf("LIBERASURECODE_WRITE_LEGACY_CRC=%s", val), func(t *testing.T) {
+			os.Setenv("LIBERASURECODE_WRITE_LEGACY_CRC", val)
+			input := bytes.Repeat([]byte("X"), 1000)
+			backend, err := InitBackend(
+				Params{
+					Name: "liberasurecode_rs_vand",
+					K:    2,
+					M:    1,
+				})
+			if err != nil {
+				t.Fatalf("Error creating backend: %q", err)
+			}
+			frags, err := backend.Encode(input)
+			if err != nil {
+				t.Fatalf("Error encoding frags: %q", err)
+			}
+			for index, frag := range frags {
+				info := GetFragmentInfo(frag)
+				if !info.IsValid {
+					t.Errorf("Expected frag %v to be valid", index)
+				}
+				if unexpectedChecksum := crc32.ChecksumIEEE(frag[0:59]); info.MetadataChecksum == unexpectedChecksum {
+					t.Errorf("Expected frag %v metadata CRC to not use IEEE CRC32, but it did", index)
+				}
+			}
+		})
+	}
 }
