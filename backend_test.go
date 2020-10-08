@@ -2,6 +2,7 @@ package erasurecode
 
 import (
 	"bytes"
+	"hash/crc32"
 	"math/rand"
 	"sync"
 	"testing"
@@ -184,6 +185,11 @@ func TestEncodeDecode(t *testing.T) {
 						}
 						if !info.IsValid {
 							t.Errorf("Expected frag %v to be valid", index)
+						}
+						if !expectedVersion.Less(Version{1, 6, 0}) {
+							if expectedChecksum := crc32.ChecksumIEEE(frag[0:59]); info.MetadataChecksum != expectedChecksum {
+								t.Errorf("Expected frag %v to have metadata CRC %x; got %x", index, expectedChecksum, info.MetadataChecksum)
+							}
 						}
 					}
 

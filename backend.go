@@ -15,6 +15,7 @@ uint64_t getOrigDataSize(struct fragment_header_s *header) { return header->meta
 uint32_t getBackendVersion(struct fragment_header_s *header) { return header->meta.backend_version; }
 ec_backend_id_t getBackendID(struct fragment_header_s *header) { return header->meta.backend_id; }
 uint32_t getECVersion(struct fragment_header_s *header) { return header->libec_version; }
+uint32_t getMetadataChksum(struct fragment_header_s *header) { return header->metadata_chksum; }
 */
 import "C"
 
@@ -214,6 +215,7 @@ type FragmentInfo struct {
 	BackendVersion      Version
 	ErasureCodeVersion  Version
 	IsValid             bool
+	MetadataChecksum    uint32
 }
 
 func GetFragmentInfo(frag []byte) FragmentInfo {
@@ -229,5 +231,6 @@ func GetFragmentInfo(frag []byte) FragmentInfo {
 		BackendVersion:      makeVersion(C.getBackendVersion(&header)),
 		ErasureCodeVersion:  makeVersion(C.getECVersion(&header)),
 		IsValid:             C.is_invalid_fragment_header((*C.fragment_header_t)(&header)) == 0,
+		MetadataChecksum:    uint32(C.getMetadataChksum(&header)),
 	}
 }
